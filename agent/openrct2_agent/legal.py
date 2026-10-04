@@ -1,0 +1,342 @@
+"""Enumerate currently legal actions for a GameState."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from .catalog import MARKETING_CAMPAIGNS, RESEARCH_FUNDING, RIDES, SCENERY, STAFF_HIRE_COST, STALLS
+from .engine import GameState, footprint_ok, money_str, neighbors, path_reachable
+
+
+def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict[str, Any]:
+    """Return grouped + flattened legal actions. Always includes wait / inspect / finance."""
+    if state.result != "undecided":
+        return {
+            "game_over": True,
+            "result": state.result,
+            "result_reason": state.result_reason,
+            "actions": [],
+            "actions_flat": [],
+            "action_types": [],
+            "text": f"Game over ({state.result}): {state.result_reason}. Only reset() is available.",
+        }
+
+    actions: list[dict[str, Any]] = []
+    path_tiles: list[list[int]] = []
+    remove_tiles: list[list[int]] = []
+    buy_tiles: list[list[int]] = []
+    empty_owned: list[list[int]] = []
+
+    for y in range(state.map_h):
+        for x in range(state.map_w):
+            t = state.tile(x, y)
+            if t.kind == "path":
+                remove_tiles.append([x, y])
+            if t.owned and t.kind in ("empty", "scenery") and t.kind != "entrance":
+                if t.kind == "empty" or t.tree:
+                    path_tiles.append([x, y])
+                    empty_owned.append([x, y])
+            if (not t.owned) and t.kind != "water":
+                for nx, ny in neighbors(x, y):
+                    if state.in_bounds(nx, ny) and state.tile(nx, ny).owned:
+                        buy_tiles.append([x, y])
+                        break
+
+    for x, y in path_tiles:
+        actions.append(
+            {
+                "id": f"place_path:{x},{y}",
+                "type": "place_path",
+                "params": {"x": x, "y": y},
+                "cost": 1000,
+                "description": f"Place path at ({x},{y}) for {money_str(1000)}",
+            }
+        )
+    for x, y in remove_tiles:
+        actions.append(
+            {
+                "id": f"remove_path:{x},{y}",
+                "type": "remove_path",
+                "params": {"x": x, "y": y},
+                "description": f"Remove path at ({x},{y})",
+            }
+        )
+    for x, y in buy_tiles:
+        actions.append(
+            {
+                "id": f"buy_land:{x},{y}",
+                "type": "buy_land",
+                "params": {"x": x, "y": y},
+                "cost": state.land_price,
+                "description": f"Buy land ({x},{y}) for {money_str(state.land_price)}",
+            }
+        )
+
+    invented_rides = [RIDES[i] for i in state.invented if i in RIDES]
+    invented_stalls = [STALLS[i] for i in state.invented if i in STALLS]
+    ride_origins: dict[str, list[list[int]]] = {}
+    for spec in invented_rides:
+        if spec.build_cost > state.cash + 50_000:
+            # still list a few so the agent knows it exists
+            origins: list[list[int]] = []
+        else:
+            origins = []
+            w, h = spec.footprint
+            for y in range(state.map_h - h + 1):
+                for x in range(state.map_w - w + 1):
+                    ok, _ = footprint_ok(state, x, y, w, h)
+                    if ok:
+                        origins.append([x, y])
+        ride_origins[spec.id] = origins
+        # Cap per-ride origin listing in the flat list to keep it usable.
+        for x, y in origins[:40]:
+            actions.append(
+                {
+                    "id": f"place_ride:{spec.id},{x},{y}",
+                    "type": "place_ride",
+                    "params": {"ride_type": spec.id, "x": x, "y": y, "rotation": 0},
+                    "cost": spec.build_cost,
+                    "description": (
+                        f"Build {spec.name} ({w}x{h}, {spec.category}) at ({x},{y}) "
+                        f"for {money_str(spec.build_cost)} — E{spec.excitement/100:.2f} "
+                        f"I{spec.intensity/100:.2f} N{spec.nausea/100:.2f}"
+                    ),
+                }
+            )
+
+    stall_origins: dict[str, list[list[int]]] = {}
+    for spec in invented_stalls:
+        origins = []
+        w, h = spec.footprint
+        for y in range(state.map_h - h + 1):
+            for x in range(state.map_w - w + 1):
+                ok, _ = footprint_ok(state, x, y, w, h)
+                if ok:
+                    origins.append([x, y])
+        stall_origins[spec.id] = origins
+        for x, y in origins[:30]:
+            actions.append(
+                {
+                    "id": f"place_stall:{spec.id},{x},{y}",
+                    "type": "place_stall",
+                    "params": {"stall_type": spec.id, "x": x, "y": y},
+                    "cost": spec.build_cost,
+                    "description": f"Build {spec.name} at ({x},{y}) for {money_str(spec.build_cost)}",
+                }
+            )
+
+    for spec in SCENERY.values():
+        for x, y in empty_owned[:20]:
+            actions.append(
+                {
+                    "id": f"place_scenery:{spec.id},{x},{y}",
+                    "type": "place_scenery",
+                    "params": {"scenery_type": spec.id, "x": x, "y": y},
+                    "cost": spec.build_cost,
+                    "description": f"Place {spec.name} at ({x},{y})",
+                }
+            )
+
+    for ride in state.rides:
+        actions.append(
+            {
+                "id": f"set_ride_status:{ride.id},open",
+                "type": "set_ride_status",
+                "params": {"ride_id": ride.id, "status": "open"},
+                "description": f"Open {ride.spec.name} #{ride.id}",
+            }
+        )
+        if ride.status != "closed":
+            actions.append(
+                {
+                    "id": f"set_ride_status:{ride.id},closed",
+                    "type": "set_ride_status",
+                    "params": {"ride_id": ride.id, "status": "closed"},
+                    "description": f"Close {ride.spec.name} #{ride.id}",
+                }
+            )
+        for p in (0, 50, 80, 100, 120, 150, 200, 250, 300, 400):
+            actions.append(
+                {
+                    "id": f"set_ride_price:{ride.id},{p}",
+                    "type": "set_ride_price",
+                    "params": {"ride_id": ride.id, "price": p},
+                    "description": f"Set {ride.spec.name} #{ride.id} price to {money_str(p)}",
+                }
+            )
+        actions.append(
+            {
+                "id": f"demolish_ride:{ride.id}",
+                "type": "demolish_ride",
+                "params": {"ride_id": ride.id},
+                "description": f"Demolish {ride.spec.name} #{ride.id}",
+            }
+        )
+
+    for stall in state.stalls:
+        for p in (0, 50, 80, 90, 100, 120, 150):
+            actions.append(
+                {
+                    "id": f"set_stall_price:{stall.id},{p}",
+                    "type": "set_stall_price",
+                    "params": {"stall_id": stall.id, "price": p},
+                    "description": f"Set {stall.spec.name} #{stall.id} price to {money_str(p)}",
+                }
+            )
+        actions.append(
+            {
+                "id": f"demolish_stall:{stall.id}",
+                "type": "demolish_stall",
+                "params": {"stall_id": stall.id},
+                "description": f"Demolish {stall.spec.name} #{stall.id}",
+            }
+        )
+
+    for kind in STAFF_HIRE_COST:
+        actions.append(
+            {
+                "id": f"hire_staff:{kind}",
+                "type": "hire_staff",
+                "params": {"staff_type": kind},
+                "cost": STAFF_HIRE_COST[kind],
+                "description": f"Hire a {kind} for {money_str(STAFF_HIRE_COST[kind])}",
+            }
+        )
+    for s in state.staff:
+        actions.append(
+            {
+                "id": f"fire_staff:{s.id}",
+                "type": "fire_staff",
+                "params": {"staff_id": s.id},
+                "description": f"Fire {s.kind} #{s.id}",
+            }
+        )
+
+    actions.append(
+        {
+            "id": f"set_park_open:{str(not state.park_open).lower()}",
+            "type": "set_park_open",
+            "params": {"open": (not state.park_open)},
+            "description": "Close the park" if state.park_open else "OPEN the park (guests can enter)",
+        }
+    )
+    for fee in (0, 200, 500, 1000, 1500, 2000, 3000):
+        actions.append(
+            {
+                "id": f"set_entrance_fee:{fee}",
+                "type": "set_entrance_fee",
+                "params": {"fee": fee},
+                "description": f"Set entrance fee to {money_str(fee)}",
+            }
+        )
+    for level in RESEARCH_FUNDING:
+        actions.append(
+            {
+                "id": f"set_research_funding:{level}",
+                "type": "set_research_funding",
+                "params": {"level": level},
+                "description": f"Research funding: {level}",
+            }
+        )
+    for camp, spec in MARKETING_CAMPAIGNS.items():
+        if not any(c.kind == camp for c in state.campaigns):
+            actions.append(
+                {
+                    "id": f"start_marketing:{camp}",
+                    "type": "start_marketing",
+                    "params": {"campaign": camp},
+                    "cost": spec["cost"],
+                    "description": f"{spec['name']} ({money_str(spec['cost'])}, {spec['weeks']} weeks)",
+                }
+            )
+    step = 100000
+    for loan in range(0, state.max_loan + 1, step):
+        if loan != state.loan:
+            actions.append(
+                {
+                    "id": f"set_loan:{loan}",
+                    "type": "set_loan",
+                    "params": {"loan": loan},
+                    "description": f"Set loan to {money_str(loan)}",
+                }
+            )
+
+    for n in (1, 2, 3, 4):
+        actions.append(
+            {
+                "id": f"wait:{n}",
+                "type": "wait",
+                "params": {"months": n},
+                "description": f"Advance {n} month(s) of park simulation",
+            }
+        )
+    actions.append(
+        {
+            "id": "wait_days:7",
+            "type": "wait_days",
+            "params": {"days": 7},
+            "description": "Advance 1 week",
+        }
+    )
+
+    if len(actions) > max_tile_actions:
+        # Keep all non-tile actions; trim place_* origins already capped per type.
+        pass
+
+    reachable = path_reachable(state)
+    text_lines = [
+        f"{len(actions)} legal actions. Prefer building paths from the entrance {state.entrance},",
+        "then stalls (toilets, drinks, food), then rides, hire handyman+mechanic, OPEN the park, wait.",
+        f"Path tiles you can pave: {len(path_tiles)} (ids place_path:x,y).",
+        f"Buyable land plots: {len(buy_tiles)}.",
+        f"Invented rides: {', '.join(s.id for s in invented_rides)}.",
+        f"Invented stalls: {', '.join(s.id for s in invented_stalls)}.",
+        f"Entrance path connectivity: {len(reachable)} tiles.",
+        "You may also pass JSON: {\"type\":\"place_ride\",\"ride_type\":\"merry_go_round\",\"x\":7,\"y\":10}.",
+        "Any invented ride may be placed at ANY origin in ride_origins even if the flat list was truncated.",
+    ]
+    action_types = [
+        {
+            "type": "place_path",
+            "params": {"x": "int", "y": "int"},
+            "valid_tiles": path_tiles,
+        },
+        {
+            "type": "place_ride",
+            "params": {"ride_type": "str", "x": "int", "y": "int", "rotation": "0|90"},
+            "rides": [
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "cost": s.build_cost,
+                    "footprint": list(s.footprint),
+                    "category": s.category,
+                    "excitement": s.excitement,
+                    "intensity": s.intensity,
+                    "nausea": s.nausea,
+                }
+                for s in invented_rides
+            ],
+            "origins": ride_origins,
+        },
+        {
+            "type": "place_stall",
+            "params": {"stall_type": "str", "x": "int", "y": "int"},
+            "stalls": [
+                {"id": s.id, "name": s.name, "cost": s.build_cost, "kind": s.kind} for s in invented_stalls
+            ],
+            "origins": stall_origins,
+        },
+        {"type": "wait", "params": {"months": "1-16"}},
+        {"type": "set_park_open", "params": {"open": "bool"}},
+        {"type": "hire_staff", "params": {"staff_type": list(STAFF_HIRE_COST)}},
+    ]
+    return {
+        "game_over": False,
+        "result": state.result,
+        "count": len(actions),
+        "actions": actions,
+        "actions_flat": [a["id"] for a in actions],
+        "action_types": action_types,
+        "text": "\n".join(text_lines),
+    }
