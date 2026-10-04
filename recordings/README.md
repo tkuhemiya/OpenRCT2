@@ -10,7 +10,8 @@ Gentle Glen (`gentle_intro`), seed **11**, heuristic policy.
   → `03_gates_open.png` six rides, gates OPEN
   → `04_guests_arrive.png` wait:1, 121 guests, SUCCESS
   → `05_success.png` same park one animation beat later (cars and peeps moved)
-- **Watch the park:** `agent_play_gameplay.mp4` (~40s, 10 fps)
+- **PR screenshots:** `recordings/pr_screenshots/`
+  (`01_gentle_glen_new_park.png` … `08_ride_silhouettes.png`)
 - Start / end stills: `agent_play_gameplay_start.png` / `agent_play_gameplay_end.png`
 - ASCII HUD (older): `agent_play.mp4` and `agent_play_transcript.txt`
 - Machine replay: `replay.json`
