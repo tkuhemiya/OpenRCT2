@@ -54,7 +54,8 @@ class ScenerySpec:
     name: str
     build_cost: int
     symbol: str
-    kind: str  # tree, garden, bench, lamp, bin
+    kind: str  # tree, shrub, garden, path, fence, wall, statue, theme
+    start_invented: bool = True
 
 
 RIDES: dict[str, RideSpec] = {
@@ -285,6 +286,44 @@ RIDES: dict[str, RideSpec] = {
             True,
             500,
         ),
+        # Remaining vanilla RCT2 ride types (Ride.h 0–90, skipping unused/alt).
+        RideSpec("spiral_coaster", "Spiral Roller Coaster", "rollercoaster", (6, 6), 348000, 19000, 658, 548, 428, 36, 78, 360, "rollercoaster", False, True, 540),
+        RideSpec("stand_up_coaster", "Stand-up Roller Coaster", "rollercoaster", (6, 5), 372000, 21000, 702, 628, 468, 32, 74, 400, "rollercoaster", False, True, 520),
+        RideSpec("mini_suspended_coaster", "Mini Suspended Coaster", "rollercoaster", (5, 4), 198000, 12500, 462, 318, 248, 28, 82, 260, "rollercoaster", False, True, 280),
+        RideSpec("steeplechase", "Steeplechase", "rollercoaster", (5, 3), 176000, 11000, 428, 338, 198, 26, 84, 240, "rollercoaster", False, True, 260),
+        RideSpec("launched_freefall", "Launched Freefall", "thrill", (2, 2), 112000, 9800, 418, 698, 478, 18, 80, 280, "thrill", False),
+        RideSpec("bobsleigh", "Bobsleigh Coaster", "rollercoaster", (5, 5), 248000, 15500, 548, 398, 288, 34, 81, 300, "rollercoaster", False, True, 420),
+        RideSpec("swinging_inverter_ship", "Swinging Inverter Ship", "thrill", (5, 2), 78000, 8200, 312, 458, 398, 24, 80, 220, "thrill", False),
+        RideSpec("space_rings", "Space Rings", "gentle", (3, 3), 42000, 3800, 158, 92, 68, 22, 94, 90, "gentle", False),
+        RideSpec("reverse_freefall_coaster", "Reverse Freefall Coaster", "rollercoaster", (4, 6), 398000, 22000, 712, 748, 518, 20, 70, 450, "rollercoaster", False, True, 200),
+        RideSpec("lift", "Lift", "transport", (1, 1), 38000, 2800, 128, 22, 12, 30, 96, 60, "transport", False),
+        RideSpec("vertical_drop_coaster", "Vertical Drop Roller Coaster", "rollercoaster", (6, 6), 428000, 24000, 748, 698, 528, 34, 72, 450, "rollercoaster", False, True, 580),
+        RideSpec("twister_coaster", "Twister Roller Coaster", "rollercoaster", (6, 6), 402000, 22500, 736, 662, 498, 36, 73, 430, "rollercoaster", False, True, 600),
+        RideSpec("steel_wild_mouse", "Steel Wild Mouse", "rollercoaster", (5, 5), 196000, 13500, 512, 428, 338, 24, 76, 300, "rollercoaster", False, True, 340),
+        RideSpec("multi_dimension_coaster", "Multi-Dimension Roller Coaster", "rollercoaster", (6, 6), 448000, 25000, 768, 682, 548, 30, 70, 460, "rollercoaster", False, True, 560),
+        RideSpec("flying_coaster", "Flying Roller Coaster", "rollercoaster", (6, 6), 438000, 24500, 758, 672, 538, 32, 71, 450, "rollercoaster", False, True, 560),
+        RideSpec("splash_boats", "Splash Boats", "water", (5, 5), 168000, 11000, 398, 258, 188, 34, 84, 220, "water", False),
+        RideSpec("mini_helicopters", "Mini Helicopters", "gentle", (4, 3), 62000, 4800, 188, 52, 28, 26, 90, 110, "gentle", False),
+        RideSpec("lay_down_coaster", "Lay-down Roller Coaster", "rollercoaster", (6, 5), 418000, 23500, 742, 688, 528, 30, 72, 440, "rollercoaster", False, True, 540),
+        RideSpec("suspended_monorail", "Suspended Monorail", "transport", (5, 3), 142000, 9200, 268, 42, 22, 44, 90, 130, "transport", False),
+        RideSpec("reverser_coaster", "Reverser Roller Coaster", "rollercoaster", (5, 4), 228000, 14500, 498, 368, 318, 28, 79, 280, "rollercoaster", False, True, 360),
+        RideSpec("heartline_twister", "Heartline Twister Coaster", "rollercoaster", (4, 4), 212000, 15000, 528, 628, 548, 18, 74, 320, "rollercoaster", False, True, 220),
+        RideSpec("mini_golf", "Mini Golf", "gentle", (4, 4), 48000, 2200, 168, 18, 8, 36, 98, 70, "gentle", False),
+        RideSpec("giga_coaster", "Giga Coaster", "rollercoaster", (6, 6), 468000, 26000, 792, 718, 548, 40, 70, 500, "rollercoaster", False, True, 720),
+        RideSpec("roto_drop", "Roto-Drop", "thrill", (2, 2), 108000, 9200, 392, 718, 498, 20, 78, 270, "thrill", False),
+        RideSpec("flying_saucers", "Flying Saucers", "gentle", (4, 4), 66000, 6200, 228, 108, 72, 28, 88, 140, "gentle", False),
+        RideSpec("monorail_cycles", "Monorail Cycles", "transport", (4, 2), 54000, 3200, 158, 38, 18, 20, 92, 80, "transport", False),
+        RideSpec("compact_inverted", "Compact Inverted Coaster", "rollercoaster", (5, 5), 318000, 19500, 628, 598, 458, 30, 75, 380, "rollercoaster", False, True, 420),
+        RideSpec("water_coaster", "Water Coaster", "water", (6, 5), 288000, 17500, 568, 418, 328, 32, 78, 340, "water", False, True, 440),
+        RideSpec("air_powered_vertical", "Air Powered Vertical Coaster", "rollercoaster", (3, 6), 388000, 21500, 698, 728, 508, 22, 73, 420, "rollercoaster", False, True, 180),
+        RideSpec("inverted_hairpin", "Inverted Hairpin Coaster", "rollercoaster", (5, 5), 268000, 16500, 548, 518, 398, 24, 76, 340, "rollercoaster", False, True, 360),
+        RideSpec("magic_carpet", "Magic Carpet", "gentle", (3, 2), 44000, 4200, 178, 128, 88, 24, 90, 120, "gentle", False),
+        RideSpec("submarine_ride", "Submarine Ride", "water", (5, 3), 98000, 7200, 248, 62, 38, 28, 88, 160, "water", False),
+        RideSpec("river_rafts", "River Rafts", "water", (5, 4), 112000, 6800, 268, 48, 28, 32, 92, 140, "water", False),
+        RideSpec("inverted_impulse", "Inverted Impulse Coaster", "rollercoaster", (4, 6), 356000, 20500, 672, 708, 518, 24, 72, 400, "rollercoaster", False, True, 240),
+        RideSpec("mini_roller_coaster", "Mini Roller Coaster", "rollercoaster", (5, 4), 188000, 12000, 468, 328, 218, 32, 84, 260, "rollercoaster", False, True, 300),
+        RideSpec("mine_ride", "Mine Ride", "gentle", (5, 4), 124000, 8600, 318, 128, 88, 34, 88, 180, "gentle", False),
+        RideSpec("lim_launched", "LIM Launched Roller Coaster", "rollercoaster", (6, 5), 392000, 22000, 718, 678, 508, 32, 73, 420, "rollercoaster", False, True, 480),
     ]
 }
 
@@ -304,6 +343,34 @@ STALLS: dict[str, StallSpec] = {
         StallSpec("balloon_stall", "Balloon Stall", "souvenir", (1, 1), 20000, 900, 80, True, "B"),
         StallSpec("souvenir_stall", "Souvenir Stall", "souvenir", (1, 1), 26000, 1100, 150, False, "B"),
         StallSpec("umbrella_stall", "Umbrella Stall", "souvenir", (1, 1), 21000, 1000, 120, True, "U"),
+        StallSpec("candyfloss", "Candyfloss Stall", "food", (1, 1), 23000, 1600, 90, False, "F"),
+        StallSpec("popcorn", "Popcorn Stall", "food", (1, 1), 22000, 1500, 90, False, "F"),
+        StallSpec("hot_dog", "Hot Dog Stall", "food", (1, 1), 25000, 1900, 110, False, "F"),
+        StallSpec("seafood", "Seafood Stall", "food", (1, 1), 27000, 2100, 130, False, "F"),
+        StallSpec("toffee_apple", "Toffee Apple Stall", "food", (1, 1), 21000, 1400, 80, False, "F"),
+        StallSpec("doughnut", "Doughnut Stall", "food", (1, 1), 23000, 1600, 90, False, "F"),
+        StallSpec("chicken", "Fried Chicken Stall", "food", (1, 1), 28000, 2300, 140, False, "F"),
+        StallSpec("pretzel", "Pretzel Stall", "food", (1, 1), 22000, 1500, 90, False, "F"),
+        StallSpec("funnel_cake", "Funnel Cake Stall", "food", (1, 1), 25000, 1800, 110, False, "F"),
+        StallSpec("beef_noodles", "Beef Noodles Stall", "food", (1, 1), 27000, 2100, 130, False, "F"),
+        StallSpec("fried_rice_noodles", "Fried Rice Noodles Stall", "food", (1, 1), 26000, 2000, 120, False, "F"),
+        StallSpec("wonton_soup", "Wonton Soup Stall", "food", (1, 1), 25000, 1900, 120, False, "F"),
+        StallSpec("meatball_soup", "Meatball Soup Stall", "food", (1, 1), 25000, 1900, 120, False, "F"),
+        StallSpec("sub_sandwich", "Sub Sandwich Stall", "food", (1, 1), 26000, 2000, 130, False, "F"),
+        StallSpec("cookie", "Cookie Shop", "food", (1, 1), 21000, 1400, 80, False, "F"),
+        StallSpec("roast_sausage", "Roast Sausage Stall", "food", (1, 1), 25000, 2000, 120, False, "F"),
+        StallSpec("coffee", "Coffee Shop", "drink", (1, 1), 24000, 1800, 110, False, "D"),
+        StallSpec("lemonade", "Lemonade Stall", "drink", (1, 1), 21000, 1500, 90, False, "D"),
+        StallSpec("iced_tea", "Iced Tea Stall", "drink", (1, 1), 22000, 1600, 100, False, "D"),
+        StallSpec("fruit_juice", "Fruit Juice Stall", "drink", (1, 1), 23000, 1700, 100, False, "D"),
+        StallSpec("soybean_milk", "Soybean Milk Stall", "drink", (1, 1), 22000, 1600, 90, False, "D"),
+        StallSpec("sujeonggwa", "Sujeonggwa Stall", "drink", (1, 1), 23000, 1700, 100, False, "D"),
+        StallSpec("hot_chocolate", "Hot Chocolate Stall", "drink", (1, 1), 23000, 1700, 100, False, "D"),
+        StallSpec("hat_stall", "Hat Stall", "souvenir", (1, 1), 24000, 1100, 150, False, "B"),
+        StallSpec("tshirt_stall", "T-Shirt Stall", "souvenir", (1, 1), 28000, 1300, 180, False, "B"),
+        StallSpec("toy_stall", "Toy Stall", "souvenir", (1, 1), 25000, 1200, 160, False, "B"),
+        StallSpec("sunglasses", "Sunglasses Stall", "souvenir", (1, 1), 22000, 1000, 140, False, "B"),
+        StallSpec("photo_stall", "Souvenir Photos", "souvenir", (1, 1), 30000, 1400, 200, False, "B"),
     ]
 }
 
@@ -311,13 +378,106 @@ STALLS: dict[str, StallSpec] = {
 SCENERY: dict[str, ScenerySpec] = {
     spec.id: spec
     for spec in [
-        ScenerySpec("tree", "Tree", 800, "^", "tree"),
-        ScenerySpec("garden", "Garden", 1200, "*", "garden"),
-        ScenerySpec("bench", "Bench", 500, "h", "bench"),
-        ScenerySpec("lamp", "Lamp", 600, "!", "lamp"),
-        ScenerySpec("bin", "Litter Bin", 400, "o", "bin"),
+        ScenerySpec("tree", "Tree", 800, "^", "tree", True),
+        ScenerySpec("oak", "Oak Tree", 900, "^", "tree", True),
+        ScenerySpec("pine", "Pine Tree", 850, "^", "tree", True),
+        ScenerySpec("palm", "Palm Tree", 1100, "^", "tree", False),
+        ScenerySpec("cactus", "Cactus", 700, "^", "tree", False),
+        ScenerySpec("snow_tree", "Snow Tree", 950, "^", "tree", False),
+        ScenerySpec("shrub", "Shrub", 400, "*", "shrub", True),
+        ScenerySpec("hedge", "Hedge", 350, "*", "shrub", True),
+        ScenerySpec("garden", "Garden", 1200, "*", "garden", True),
+        ScenerySpec("flower_bed", "Flower Bed", 1000, "*", "garden", True),
+        ScenerySpec("topiary", "Topiary", 1400, "*", "garden", False),
+        ScenerySpec("bench", "Bench", 500, "h", "path", True),
+        ScenerySpec("lamp", "Lamp", 600, "!", "path", True),
+        ScenerySpec("bin", "Litter Bin", 400, "o", "path", True),
+        ScenerySpec("jumping_fountain", "Jumping Fountain", 1800, "~", "path", False),
+        ScenerySpec("queue_tv", "Queue-Line TV", 1600, "Q", "path", False),
+        ScenerySpec("fence", "Wooden Fence", 300, "=", "fence", True),
+        ScenerySpec("iron_fence", "Iron Fence", 450, "=", "fence", True),
+        ScenerySpec("wall", "Brick Wall", 500, "#", "wall", True),
+        ScenerySpec("castle_wall", "Castle Wall", 800, "#", "wall", False),
+        ScenerySpec("statue", "Park Statue", 2200, "&", "statue", True),
+        ScenerySpec("fountain", "Fountain", 2800, "~", "statue", False),
+        ScenerySpec("classical", "Classical Column", 2400, "I", "theme", False),
+        ScenerySpec("egyptian", "Egyptian Obelisk", 2600, "A", "theme", False),
+        ScenerySpec("jungle", "Jungle Ruin", 2300, "n", "theme", False),
+        ScenerySpec("martian", "Martian Sculpture", 2700, "M", "theme", False),
+        ScenerySpec("wonderland", "Wonderland Prop", 2500, "W", "theme", False),
+        ScenerySpec("jurassic", "Jurassic Fossil", 2800, "J", "theme", False),
+        ScenerySpec("pagoda", "Pagoda Piece", 2400, "P", "theme", False),
+        ScenerySpec("mine", "Mine Timber", 1800, "m", "theme", False),
+        ScenerySpec("medieval", "Medieval Banner", 1600, "b", "theme", False),
+        ScenerySpec("space", "Space Antenna", 3000, "+", "theme", False),
+        ScenerySpec("creepy", "Creepy Gravestone", 1400, "+", "theme", False),
+        ScenerySpec("urban", "City Planter", 1500, "u", "theme", False),
     ]
 }
+
+# RCT2 land, path, weather, and music catalogs (visual + legal metadata).
+TERRAIN_SURFACES = (
+    "grass",
+    "sand",
+    "dirt",
+    "rock",
+    "martian",
+    "chequerboard",
+    "grass_clumps",
+    "ice",
+    "grid",
+    "sand_red",
+    "sand_brown",
+)
+PATH_TYPES = ("dirt", "crazy", "cobblestone", "tarmac", "tile", "queue")
+WEATHER_TYPES = ("sunny", "partial", "cloudy", "rain", "heavy_rain", "thunder")
+RIDE_MUSIC = (
+    "dodgems",
+    "fairground_organ",
+    "roman_fanfare",
+    "oriental",
+    "martian",
+    "jungle_drums",
+    "egyptian",
+    "toyland",
+    "space",
+    "horror",
+    "techno",
+    "gentle",
+    "summer",
+    "water",
+    "wild_west",
+    "jurassic",
+    "rock_1",
+    "ragtime",
+    "fantasy",
+    "rock_2",
+    "ice",
+    "snow",
+    "custom_1",
+    "custom_2",
+    "medieval",
+    "urban",
+    "organ",
+    "mechanical",
+    "modern",
+    "pirate",
+    "rock_3",
+    "candy",
+)
+ENTERTAINER_COSTUMES = (
+    "panda",
+    "tiger",
+    "elephant",
+    "roman",
+    "gorilla",
+    "snowman",
+    "knight",
+    "astronaut",
+    "bandit",
+    "sheriff",
+    "pirate",
+)
 
 
 PATH_COST = 1000  # £10.00 per tile, close to RCT2
@@ -357,6 +517,8 @@ MARKETING_CAMPAIGNS = {
     "ride_free": {"name": "Free ride vouchers", "cost": 40000, "weeks": 6, "guest_bonus": 6},
     "park_ads": {"name": "Park advertising", "cost": 35000, "weeks": 4, "guest_bonus": 5},
     "ride_ads": {"name": "Ride advertising", "cost": 35000, "weeks": 4, "guest_bonus": 5},
+    "food_ads": {"name": "Food advertising", "cost": 30000, "weeks": 4, "guest_bonus": 4},
+    "souvenir_ads": {"name": "Souvenir advertising", "cost": 25000, "weeks": 4, "guest_bonus": 3},
 }
 
 MONTHS = ["March", "April", "May", "June", "July", "August", "September", "October"]
@@ -388,6 +550,8 @@ class ScenarioSpec:
     suggested_guest_max: int = 400
     guest_initial_cash: int = 5000
     land_price: int = LAND_PRICE_DEFAULT
+    terrain: str = "grass"
+    path_type: str = "crazy"
 
 
 SCENARIOS: dict[str, ScenarioSpec] = {
@@ -428,6 +592,8 @@ SCENARIOS: dict[str, ScenarioSpec] = {
         max_loan=2_500_000,
         start_invented_extra=["twist", "junior_coaster", "boat_hire"],
         suggested_guest_max=700,
+        terrain="sand",
+        path_type="tarmac",
     ),
     "have_fun": ScenarioSpec(
         id="have_fun",
@@ -447,12 +613,13 @@ SCENARIOS: dict[str, ScenarioSpec] = {
 def invented_at_start(scenario: ScenarioSpec) -> set[str]:
     invented = {rid for rid, spec in RIDES.items() if spec.start_invented}
     invented |= {sid for sid, spec in STALLS.items() if spec.start_invented}
+    invented |= {sid for sid, spec in SCENERY.items() if spec.start_invented}
     invented |= set(scenario.start_invented_extra)
     return invented
 
 
 def research_queue(invented: set[str]) -> list[str]:
-    """Uninvented ride/stall ids in a stable RCT-like category order."""
+    """Uninvented ride/stall/scenery ids in a stable RCT-like category order."""
     order_cats: list[RideCategory] = ["gentle", "thrill", "water", "rollercoaster", "transport", "shop"]
     queue: list[str] = []
     for cat in order_cats:
@@ -463,4 +630,7 @@ def research_queue(invented: set[str]) -> list[str]:
             for sid, spec in STALLS.items():
                 if sid not in invented:
                     queue.append(sid)
+    for sid, spec in SCENERY.items():
+        if sid not in invented:
+            queue.append(sid)
     return queue

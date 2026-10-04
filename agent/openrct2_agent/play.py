@@ -9,7 +9,18 @@ from typing import Any, Optional
 from .api import AgentAPI, dumps
 from .art import layout_for, pixel_to_tile
 from .audio import sfx, sfx_for_action
-from .catalog import RIDES, SCENARIOS, SCENERY, STAFF_HIRE_COST, STALLS
+from .catalog import (
+    ENTERTAINER_COSTUMES,
+    PATH_TYPES,
+    RIDES,
+    RIDE_MUSIC,
+    SCENARIOS,
+    SCENERY,
+    STAFF_HIRE_COST,
+    STALLS,
+    TERRAIN_SURFACES,
+    WEATHER_TYPES,
+)
 from .engine import GameState, money_str
 from .players import heuristic_policy
 from .visual import VisualPark, caption_for
@@ -116,13 +127,25 @@ def catalog_payload(state: Optional[GameState] = None) -> dict[str, Any]:
         "rides": [ride_row(s) for s in RIDES.values()],
         "stalls": [stall_row(s) for s in STALLS.values()],
         "scenery": [
-            {"id": s.id, "name": s.name, "cost": s.build_cost, "cost_text": money_str(s.build_cost)}
+            {
+                "id": s.id,
+                "name": s.name,
+                "cost": s.build_cost,
+                "cost_text": money_str(s.build_cost),
+                "kind": s.kind,
+                "invented": True if invented is None else s.id in invented,
+            }
             for s in SCENERY.values()
         ],
         "staff": [
             {"id": k, "name": k.title(), "cost": v, "cost_text": money_str(v)}
             for k, v in STAFF_HIRE_COST.items()
         ],
+        "entertainer_costumes": list(ENTERTAINER_COSTUMES),
+        "terrain": list(TERRAIN_SURFACES),
+        "path_types": list(PATH_TYPES),
+        "weather": list(WEATHER_TYPES),
+        "music": list(RIDE_MUSIC),
     }
 
 

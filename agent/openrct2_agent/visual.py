@@ -80,7 +80,11 @@ class VisualPark:
                         (x, y + 1) in pathish,
                         (x - 1, y) in pathish,
                     )
-                paint_tile(draw, x, y, t.kind, t.owned, t.litter, tick, lay, connected=connected)
+                paint_tile(
+                    draw, x, y, t.kind, t.owned, t.litter, tick, lay,
+                    connected=connected, surface=getattr(t, "surface", "grass") or "grass",
+                    path_style=getattr(t, "path_style", "crazy") or "crazy",
+                )
 
         for diag in range(state.map_w + state.map_h - 1):
             for x in range(state.map_w):
@@ -90,12 +94,12 @@ class VisualPark:
                 t = state.tile(x, y)
                 if (x, y) in occupied_trees:
                     continue
-                if t.tree or (t.kind == "scenery" and t.scenery_id == "tree"):
-                    if t.kind in ("path", "entrance", "ride", "stall", "water"):
-                        continue
-                    paint_tree(draw, x, y, lay, x * 17 + y * 9)
-                elif t.kind == "scenery" and t.scenery_id:
+                if t.kind in ("path", "entrance", "ride", "stall", "water"):
+                    continue
+                if t.kind == "scenery" and t.scenery_id:
                     paint_scenery(draw, x, y, t.scenery_id, lay)
+                elif t.tree:
+                    paint_tree(draw, x, y, lay, x * 17 + y * 9)
 
         buildings: list[tuple[int, object, str]] = []
         for s in state.stalls:

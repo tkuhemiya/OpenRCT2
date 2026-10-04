@@ -166,7 +166,11 @@ endpoints. Stdio also accepts `quit` / `exit`.
 
 The engine is the same `ParkSession` the agent uses. The park camera is
 **drawn in code** (isometric tiles, rides, stalls, peeps) so every catalog
-object has a silhouette without a pile of PNGs.
+object has a silhouette without a pile of PNGs. The catalog matches **vanilla
+RCT2** (OpenRCT2 `Ride.h` types 0–90, `ShopItem` stalls, scenery groups,
+terrain surfaces, weather, path types, ride music, and `SoundId` through
+`portcullis`). Research unlocks the rest of the set the same way the real
+game does.
 
 ```bash
 export PYTHONPATH=agent

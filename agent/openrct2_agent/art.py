@@ -12,7 +12,7 @@ from typing import Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .catalog import RIDES, STALLS
+from .catalog import RIDES, SCENERY, STALLS
 from .engine import GameState, RideInstance, StallInstance, money_str
 
 
@@ -32,6 +32,29 @@ UNOWNED_B = (36, 74, 30)
 PATH_A = (198, 160, 98)
 PATH_B = (172, 132, 74)
 PATH_EDGE = (128, 92, 48)
+
+TERRAIN_PALETTE: dict[str, tuple[Color, Color, Color]] = {
+    "grass": ((86, 172, 54), (68, 148, 40), (48, 112, 28)),
+    "sand": ((214, 186, 118), (196, 164, 92), (168, 132, 68)),
+    "sand_brown": ((186, 142, 82), (164, 118, 62), (132, 92, 48)),
+    "sand_red": ((196, 112, 72), (168, 88, 52), (132, 64, 40)),
+    "dirt": ((132, 96, 58), (108, 78, 44), (82, 56, 32)),
+    "rock": ((128, 124, 118), (96, 94, 90), (72, 70, 66)),
+    "martian": ((176, 72, 48), (148, 52, 36), (112, 36, 24)),
+    "chequerboard": ((48, 48, 52), (220, 220, 214), (24, 24, 28)),
+    "grass_clumps": ((70, 148, 48), (92, 168, 56), (48, 112, 28)),
+    "ice": ((198, 222, 236), (168, 200, 224), (120, 160, 196)),
+    "grid": ((86, 172, 54), (40, 40, 44), (48, 112, 28)),
+}
+
+PATH_PALETTE: dict[str, tuple[Color, Color, Color]] = {
+    "crazy": ((198, 160, 98), (172, 132, 74), (128, 92, 48)),
+    "dirt": ((156, 118, 70), (132, 96, 54), (96, 70, 40)),
+    "cobblestone": ((148, 148, 152), (120, 120, 124), (88, 88, 92)),
+    "tarmac": ((64, 68, 74), (48, 52, 58), (32, 34, 38)),
+    "tile": ((188, 196, 204), (160, 168, 176), (120, 124, 132)),
+    "queue": ((196, 64, 56), (164, 48, 42), (120, 32, 28)),
+}
 WATER_A = (42, 154, 186)
 WATER_B = (28, 118, 156)
 WATER_EDGE = (18, 78, 118)
@@ -127,19 +150,33 @@ def paint_sky(draw: ImageDraw.ImageDraw, lay: IsoLayout, weather: str = "sunny")
     h = lay.height - top
     for i in range(0, h, 3):
         t = i / max(1, h)
-        if weather == "rain":
+        if weather in ("rain", "heavy_rain"):
             col = mix((92, 112, 132), (36, 56, 40), t)
-        elif weather == "thunder":
+        elif weather in ("thunder", "storm"):
             col = mix((70, 78, 96), (28, 40, 32), t)
+        elif weather == "cloudy":
+            col = mix((148, 176, 204), (46, 96, 48), min(1.0, t * 1.15))
+        elif weather == "partial":
+            col = mix((156, 198, 228), (46, 96, 48), min(1.0, t * 1.15))
         else:
             col = mix((132, 194, 236), (46, 96, 48), min(1.0, t * 1.15))
         draw.rectangle([0, top + i, lay.width, top + i + 3], fill=col)
     if weather == "sunny":
         draw.ellipse([lay.width - 90, top + 12, lay.width - 42, top + 58], fill=(255, 220, 90))
         draw.ellipse([lay.width - 86, top + 16, lay.width - 46, top + 54], fill=(255, 236, 140))
-    elif weather in ("cloudy", "rain", "thunder"):
+    elif weather == "partial":
+        draw.ellipse([lay.width - 90, top + 12, lay.width - 42, top + 58], fill=(255, 220, 90))
+        draw.ellipse([lay.width - 120, top + 22, lay.width - 72, top + 44], fill=(230, 232, 236))
+    elif weather in ("cloudy", "rain", "heavy_rain", "thunder", "storm"):
         for ox, oy in ((lay.width - 120, top + 18), (lay.width - 88, top + 26), (lay.width - 150, top + 28)):
-            draw.ellipse([ox, oy, ox + 48, oy + 22], fill=(220, 224, 230))
+            draw.ellipse([ox, oy, ox + 48, oy + 22], fill=(180, 186, 196) if weather in ("thunder", "storm") else (220, 224, 230))
+    if weather in ("rain", "heavy_rain", "thunder", "storm"):
+        seed = 91 if weather == "rain" else 17
+        n = 28 if weather == "rain" else 48
+        for i in range(n):
+            x = (i * 47 + seed) % max(8, lay.width)
+            y = top + 8 + (i * 29 + seed) % max(8, h - 16)
+            draw.line([(x, y), (x - 2, y + 8)], fill=(180, 200, 220), width=1)
     # Distant treeline in the sky band, not on the park diamond.
     horizon = lay.hud + 44
     for i in range(18):
@@ -247,6 +284,8 @@ def paint_tile(
     lay: IsoLayout,
     *,
     connected: tuple[bool, bool, bool, bool] | None = None,
+    surface: str = "grass",
+    path_style: str = "crazy",
 ) -> None:
     pts = diamond(x, y, lay)
     n, e, s, w = pts
@@ -265,25 +304,30 @@ def paint_tile(
         )
         return
     if kind in ("path", "entrance"):
-        fill = PATH_A if litter < 2 else shade(PATH_A, 0.82)
+        pa, pb, pe = PATH_PALETTE.get(path_style, PATH_PALETTE["crazy"])
+        fill = pa if litter < 2 else shade(pa, 0.82)
         if litter >= 3:
-            fill = shade(PATH_A, 0.7)
-        speckle_diamond(draw, pts, fill, PATH_B, 6, x * 17 + y * 9)
-        # 3D edge; skip grout where the path continues so it reads as one walkway.
+            fill = shade(pa, 0.7)
+        speckle_diamond(draw, pts, fill, pb, 6, x * 17 + y * 9)
         n_ok, e_ok, s_ok, w_ok = connected or (False, False, False, False)
         if not s_ok:
-            draw.line([w, s], fill=PATH_EDGE, width=1)
+            draw.line([w, s], fill=pe, width=1)
         if not e_ok:
-            draw.line([e, s], fill=mix(PATH_A, (255, 255, 255), 0.18), width=1)
+            draw.line([e, s], fill=mix(pa, (255, 255, 255), 0.18), width=1)
         return
     if not owned:
         speckle_diamond(draw, pts, UNOWNED_A, UNOWNED_B, 7, x * 11 + y)
         draw.line([w, s], fill=shade(UNOWNED_A, 0.7), width=1)
         return
-    speckle_diamond(draw, pts, GRASS_A, GRASS_B, 11, x * 19 + y * 7)
-    draw.line([n, w], fill=mix(GRASS_A, (255, 255, 255), 0.22), width=1)
-    draw.line([w, s], fill=GRASS_EDGE, width=1)
-    draw.line([e, s], fill=shade(GRASS_EDGE, 1.1), width=1)
+    ga, gb, ge = TERRAIN_PALETTE.get(surface, TERRAIN_PALETTE["grass"])
+    if surface == "chequerboard":
+        fill = ga if (x + y) % 2 == 0 else gb
+        speckle_diamond(draw, pts, fill, shade(fill, 1.08), 4, x * 19 + y * 7)
+    else:
+        speckle_diamond(draw, pts, ga, gb, 11, x * 19 + y * 7)
+    draw.line([n, w], fill=mix(ga, (255, 255, 255), 0.22), width=1)
+    draw.line([w, s], fill=ge, width=1)
+    draw.line([e, s], fill=shade(ge, 1.1), width=1)
 
 
 def paint_tree(draw: ImageDraw.ImageDraw, x: int, y: int, lay: IsoLayout, seed: int = 0) -> None:
@@ -324,28 +368,98 @@ def paint_tree(draw: ImageDraw.ImageDraw, x: int, y: int, lay: IsoLayout, seed: 
 def paint_scenery(draw: ImageDraw.ImageDraw, x: int, y: int, scenery_id: str, lay: IsoLayout) -> None:
     top = iso(x, y, lay)
     cx, cy = top[0], top[1] + 16
-    if scenery_id == "tree":
-        paint_tree(draw, x, y, lay, x * 13 + y)
+    sid = scenery_id
+    if sid in ("tree", "oak"):
+        paint_tree(draw, x, y, lay, 0 if sid == "oak" else x * 13 + y)
         return
-    if scenery_id == "garden":
-        for i, col in enumerate(((196, 64, 90), (236, 196, 64), (64, 140, 196), (236, 120, 48))):
-            dx = (-6, 6, -2, 4)[i]
-            dy = (2, 0, -4, 4)[i]
+    if sid == "pine":
+        paint_tree(draw, x, y, lay, 1)
+        return
+    if sid == "palm":
+        draw.rectangle([cx - 2, cy - 2, cx + 2, cy + 12], fill=(150, 110, 48), outline=(80, 50, 20))
+        for ang in (200, 250, 290, 330, 20):
+            rad = math.radians(ang)
+            draw.line([(cx, cy - 4), (cx + int(math.cos(rad) * 14), cy - 4 + int(math.sin(rad) * 8))], fill=(36, 140, 48), width=3)
+        return
+    if sid == "cactus":
+        draw.rectangle([cx - 3, cy - 8, cx + 3, cy + 10], fill=(48, 140, 64), outline=(24, 80, 28))
+        draw.rectangle([cx - 10, cy - 2, cx - 3, cy + 2], fill=(48, 140, 64), outline=(24, 80, 28))
+        return
+    if sid == "snow_tree":
+        paint_tree(draw, x, y, lay, 1)
+        draw.ellipse([cx - 8, cy - 22, cx + 8, cy - 10], fill=(240, 244, 248))
+        return
+    if sid in ("shrub", "hedge"):
+        draw.ellipse([cx - 12, cy - 4, cx + 12, cy + 8], fill=(40, 120, 40), outline=(24, 80, 22))
+        if sid == "hedge":
+            draw.rectangle([cx - 14, cy + 2, cx + 14, cy + 8], fill=(36, 110, 36), outline=INK)
+        return
+    if sid in ("garden", "flower_bed", "topiary"):
+        cols = ((196, 64, 90), (236, 196, 64), (64, 140, 196), (236, 120, 48))
+        for i, col in enumerate(cols):
+            dx, dy = (-6, 6, -2, 4)[i], (2, 0, -4, 4)[i]
             draw.ellipse([cx + dx - 3, cy + dy - 3, cx + dx + 3, cy + dy + 3], fill=col)
+        if sid == "topiary":
+            draw.ellipse([cx - 6, cy - 14, cx + 6, cy - 2], fill=(48, 140, 48), outline=(24, 80, 22))
         return
-    if scenery_id == "bench":
+    if sid == "bench":
         draw.rectangle([cx - 10, cy + 2, cx + 10, cy + 8], fill=(132, 86, 40), outline=INK)
         draw.rectangle([cx - 10, cy - 2, cx + 10, cy + 2], fill=(168, 118, 62))
         return
-    if scenery_id == "lamp":
+    if sid == "lamp":
         draw.rectangle([cx - 1, cy - 10, cx + 1, cy + 10], fill=(70, 70, 78))
         draw.ellipse([cx - 5, cy - 16, cx + 5, cy - 6], fill=(255, 220, 90), outline=(180, 140, 40))
         return
-    if scenery_id == "bin":
+    if sid == "bin":
         draw.rectangle([cx - 5, cy, cx + 5, cy + 10], fill=(70, 86, 70), outline=INK)
         draw.rectangle([cx - 6, cy - 2, cx + 6, cy + 1], fill=(40, 48, 40))
         return
-    paint_tree(draw, x, y, lay, 1)
+    if sid == "jumping_fountain":
+        draw.ellipse([cx - 8, cy + 2, cx + 8, cy + 10], fill=WATER_A, outline=WATER_EDGE)
+        draw.line([(cx, cy + 4), (cx, cy - 12)], fill=(180, 220, 240), width=2)
+        return
+    if sid == "queue_tv":
+        draw.rectangle([cx - 2, cy - 2, cx + 2, cy + 10], fill=STEEL, outline=INK)
+        draw.rectangle([cx - 8, cy - 14, cx + 8, cy - 2], fill=(40, 48, 80), outline=INK)
+        draw.rectangle([cx - 6, cy - 12, cx + 6, cy - 4], fill=(80, 180, 220))
+        return
+    if sid in ("fence", "iron_fence"):
+        col = (96, 70, 40) if sid == "fence" else (70, 74, 82)
+        draw.rectangle([cx - 14, cy + 2, cx + 14, cy + 6], fill=col, outline=INK)
+        for dx in (-10, 0, 10):
+            draw.rectangle([cx + dx - 1, cy - 8, cx + dx + 1, cy + 6], fill=col)
+        return
+    if sid in ("wall", "castle_wall"):
+        col = (168, 96, 72) if sid == "wall" else (120, 124, 132)
+        draw.rectangle([cx - 14, cy - 6, cx + 14, cy + 8], fill=col, outline=INK)
+        if sid == "castle_wall":
+            draw.rectangle([cx - 14, cy - 12, cx - 8, cy - 6], fill=col, outline=INK)
+            draw.rectangle([cx + 8, cy - 12, cx + 14, cy - 6], fill=col, outline=INK)
+        return
+    if sid in ("statue", "fountain", "classical", "egyptian"):
+        draw.rectangle([cx - 6, cy + 4, cx + 6, cy + 10], fill=(160, 160, 168), outline=INK)
+        if sid == "fountain":
+            draw.ellipse([cx - 8, cy - 2, cx + 8, cy + 8], fill=WATER_A)
+        elif sid == "egyptian":
+            draw.polygon([(cx, cy - 16), (cx - 6, cy + 4), (cx + 6, cy + 4)], fill=(212, 180, 96), outline=INK)
+        else:
+            draw.rectangle([cx - 3, cy - 12, cx + 3, cy + 4], fill=(200, 200, 208), outline=INK)
+        return
+    theme = {
+        "jungle": (48, 120, 48),
+        "martian": (196, 72, 48),
+        "wonderland": (220, 120, 196),
+        "jurassic": (132, 108, 64),
+        "pagoda": (196, 48, 48),
+        "mine": (96, 72, 48),
+        "medieval": (140, 48, 48),
+        "space": (80, 160, 200),
+        "creepy": (80, 80, 72),
+        "urban": (96, 104, 88),
+    }
+    col = theme.get(sid, (120, 120, 80))
+    draw.rectangle([cx - 6, cy - 8, cx + 6, cy + 8], fill=col, outline=INK)
+    draw.polygon([(cx - 8, cy - 8), (cx + 8, cy - 8), (cx, cy - 16)], fill=shade(col, 1.15), outline=INK)
 
 
 def paint_entrance(draw: ImageDraw.ImageDraw, x: int, y: int, lay: IsoLayout, open_park: bool) -> None:
@@ -690,27 +804,154 @@ def paint_cinema(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, 
     _ = (er, sr, wr)
 
 
+def paint_space_rings(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    draw_box(draw, corners, 6, STEEL_D, shade(STEEL_D, 0.8), STEEL)
+    n, e, s, w = corners
+    cx, cy = (n[0] + s[0]) // 2, (n[1] + s[1]) // 2 - 10
+    spin = 0 if closed else tick * 7
+    for i, r in enumerate((18, 12, 6)):
+        ang = math.radians(spin + i * 40)
+        ox, oy = int(math.cos(ang) * 2), int(math.sin(ang))
+        col = shade(STEEL, 0.6) if closed else (180, 196, 220)
+        draw.ellipse([cx - r + ox, cy - r // 2 + oy, cx + r + ox, cy + r // 2 + oy], outline=col, width=2)
+
+
+def paint_saucers(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    draw_box(draw, corners, 5, (48, 48, 80), (32, 32, 56), (72, 72, 120))
+    n, e, s, w = corners
+    cx, cy = (n[0] + s[0]) // 2, (n[1] + s[1]) // 2 - 6
+    for i in range(6):
+        ang = math.radians((0 if closed else tick * 8) + i * 60)
+        sx = cx + int(math.cos(ang) * 16)
+        sy = cy + int(math.sin(ang) * 7)
+        draw.ellipse([sx - 6, sy - 3, sx + 6, sy + 4], fill=(200, 200, 210) if not closed else shade((200, 200, 210), 0.5), outline=INK)
+        draw.ellipse([sx - 3, sy - 6, sx + 3, sy - 1], fill=(80, 180, 80))
+
+
+def paint_carpet(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    draw_box(draw, corners, 8, (120, 48, 48), (88, 32, 32), (168, 72, 72))
+    n, e, s, w = corners
+    cx, cy = (n[0] + s[0]) // 2, (n[1] + s[1]) // 2 - 14
+    tilt = 0 if closed else int(math.sin(tick * 0.25) * 8)
+    draw.polygon(
+        [(cx - 18, cy + tilt), (cx + 18, cy - tilt), (cx + 16, cy + 8 - tilt), (cx - 16, cy + 8 + tilt)],
+        fill=(48, 96, 176) if not closed else shade((48, 96, 176), 0.5),
+        outline=GOLD,
+    )
+
+
+def paint_golf(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    draw_box(draw, corners, 4, (48, 120, 48), (32, 88, 32), (80, 160, 64))
+    n, e, s, w = corners
+    flag_x, flag_y = (n[0] + e[0]) // 2, (n[1] + s[1]) // 2 - 10
+    draw.rectangle([flag_x, flag_y - 16, flag_x + 2, flag_y + 8], fill=(240, 240, 230))
+    draw.polygon([(flag_x + 2, flag_y - 16), (flag_x + 12, flag_y - 10), (flag_x + 2, flag_y - 6)], fill=(220, 40, 40))
+    _ = (tick, closed, w, s)
+
+
+def paint_heli(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    draw_box(draw, corners, 6, (72, 140, 72), (44, 96, 48), (148, 188, 96))
+    n, e, s, w = corners
+    cx, cy = (n[0] + s[0]) // 2, (n[1] + s[1]) // 2 - 8
+    draw.ellipse([cx - 8, cy - 4, cx + 8, cy + 6], fill=(48, 96, 176), outline=INK)
+    spin = 0 if closed else tick * 20
+    ang = math.radians(spin)
+    dx, dy = int(math.cos(ang) * 14), int(math.sin(ang) * 5)
+    draw.line([(cx - dx, cy - 8 - dy), (cx + dx, cy - 8 + dy)], fill=STEEL, width=2)
+    _ = (e, w, s)
+
+
+def paint_freefall(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    paint_tower(draw, ride, lay, tick * 3 if not closed else 0, closed)
+
+
+def paint_bobsleigh(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    draw_box(draw, corners, 6, (168, 200, 224), (120, 160, 196), (198, 222, 236))
+    n, e, s, w = corners
+    draw.line([w, n, e], fill=(240, 248, 255), width=4)
+    t = (tick % 14) / 14
+    cx = int(w[0] + (e[0] - w[0]) * t)
+    cy = int(w[1] + (e[1] - w[1]) * t) - 4
+    draw.ellipse([cx - 5, cy - 3, cx + 5, cy + 3], fill=(40, 80, 160) if not closed else shade((40, 80, 160), 0.5), outline=INK)
+    _ = s
+
+
+def paint_steeple(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    draw_box(draw, corners, 5, (48, 120, 48), (32, 88, 32), (70, 148, 52))
+    n, e, s, w = corners
+    t = (tick % 16) / 16
+    cx = int(w[0] + (e[0] - w[0]) * t)
+    cy = int(w[1] + (e[1] - w[1]) * t) - 6
+    draw.ellipse([cx - 5, cy - 4, cx + 5, cy + 4], fill=(132, 86, 40) if not closed else shade((132, 86, 40), 0.5), outline=INK)
+    _ = (n, s)
+
+
+def paint_submarine(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    draw_box(draw, corners, 8, WATER_EDGE, shade(WATER_EDGE, 0.85), WATER_B)
+    n, e, s, w = corners
+    t = (tick % 20) / 20
+    cx = int(w[0] + (e[0] - w[0]) * t)
+    cy = int((n[1] + s[1]) // 2)
+    col = shade((60, 90, 80), 0.6) if closed else (72, 110, 96)
+    draw.ellipse([cx - 12, cy - 5, cx + 12, cy + 5], fill=col, outline=INK)
+    draw.rectangle([cx - 2, cy - 10, cx + 2, cy - 4], fill=STEEL)
+    _ = ride
+
+
+def paint_lift_cabin(draw: ImageDraw.ImageDraw, ride: RideInstance, lay: IsoLayout, tick: int, closed: bool) -> None:
+    corners = footprint_corners(ride.x, ride.y, ride.w, ride.h, lay)
+    left, right, top = _faces("transport", closed)
+    draw_box(draw, corners, 16, left, right, top)
+    n, e, s, w = corners
+    cx, cy = (n[0] + s[0]) // 2, (n[1] + s[1]) // 2 - 12
+    draw.rectangle([cx - 6, cy - 8, cx + 6, cy + 6], fill=(200, 210, 220), outline=INK)
+    _ = (tick, e, w)
+
+
 RIDE_PAINTERS = {
     "ferris_wheel": paint_ferris,
     "merry_go_round": paint_mgr,
     "observation_tower": paint_tower,
+    "lift": paint_lift_cabin,
+    "launched_freefall": paint_freefall,
+    "roto_drop": paint_freefall,
     "spiral_slide": paint_slide,
     "haunted_house": paint_house,
     "crooked_house": paint_house,
     "circus": paint_circus,
     "maze": paint_maze,
+    "mini_golf": paint_golf,
+    "space_rings": paint_space_rings,
+    "flying_saucers": paint_saucers,
+    "magic_carpet": paint_carpet,
+    "mini_helicopters": paint_heli,
     "twist": paint_spin,
     "scrambler": paint_spin,
     "gravitron": paint_spin,
     "top_spin": paint_spin,
     "enterprise": paint_spin,
     "swinging_ship": paint_ship,
+    "swinging_inverter_ship": paint_ship,
     "cinema_3d": paint_cinema,
     "motion_simulator": paint_cinema,
     "boat_hire": paint_water_ride,
     "dinghy_slide": paint_water_ride,
     "log_flume": paint_water_ride,
     "river_rapids": paint_water_ride,
+    "splash_boats": paint_water_ride,
+    "river_rafts": paint_water_ride,
+    "water_coaster": paint_water_ride,
+    "submarine_ride": paint_submarine,
+    "bobsleigh": paint_bobsleigh,
+    "steeplechase": paint_steeple,
 }
 
 
@@ -793,6 +1034,24 @@ def paint_stall(draw: ImageDraw.ImageDraw, stall: StallInstance, lay: IsoLayout)
     elif sid == "cash_machine":
         draw.rectangle([cx - 5, cy - 12, cx + 5, cy], fill=(40, 48, 56), outline=INK)
         draw.rectangle([cx - 3, cy - 8, cx + 3, cy - 4], fill=(80, 220, 80))
+    elif sid in ("candyfloss", "doughnut", "cookie", "pretzel", "funnel_cake", "toffee_apple"):
+        draw.ellipse([cx - 5, cy - 12, cx + 5, cy - 2], fill=(255, 160, 196), outline=INK)
+        draw.rectangle([cx - 1, cy - 2, cx + 1, cy + 2], fill=(240, 240, 230))
+    elif sid in ("hot_dog", "roast_sausage", "chicken", "sub_sandwich"):
+        draw.ellipse([cx - 7, cy - 8, cx + 7, cy], fill=(196, 132, 64), outline=INK)
+        draw.rectangle([cx - 6, cy - 6, cx + 6, cy - 2], fill=(240, 80, 48))
+    elif sid in ("popcorn",):
+        draw.polygon([(cx - 6, cy - 2), (cx + 6, cy - 2), (cx + 4, cy - 12), (cx - 4, cy - 12)], fill=(220, 40, 40), outline=INK)
+        draw.ellipse([cx - 3, cy - 16, cx + 3, cy - 10], fill=(255, 252, 230))
+    elif sid in ("seafood", "wonton_soup", "meatball_soup", "beef_noodles", "fried_rice_noodles"):
+        draw.ellipse([cx - 7, cy - 8, cx + 7, cy + 2], fill=(240, 240, 230), outline=INK)
+        draw.ellipse([cx - 4, cy - 6, cx + 4, cy], fill=(196, 80, 48))
+    elif sid in ("coffee", "lemonade", "iced_tea", "fruit_juice", "soybean_milk", "sujeonggwa", "hot_chocolate"):
+        draw.rectangle([cx - 4, cy - 10, cx + 4, cy], fill=(120, 72, 40) if "coffee" in sid or "chocolate" in sid else (80, 160, 220), outline=INK)
+        draw.ellipse([cx - 4, cy - 12, cx + 4, cy - 8], fill=(240, 240, 230))
+    elif sid in ("hat_stall", "tshirt_stall", "toy_stall", "sunglasses", "photo_stall"):
+        draw.rectangle([cx - 6, cy - 10, cx + 6, cy], fill=(48, 96, 176), outline=INK)
+        draw.polygon([(cx - 6, cy - 10), (cx + 6, cy - 10), (cx, cy - 16)], fill=GOLD)
     else:
         draw.rectangle([cx - 5, cy - 8, cx + 5, cy], fill=top, outline=INK)
 
@@ -917,9 +1176,9 @@ def paint_ticker(draw: ImageDraw.ImageDraw, state: GameState, lay: IsoLayout) ->
 
 
 def ensure_all_painters_registered() -> list[str]:
-    """Used by tests: every catalog ride has a drawing path (explicit or category)."""
+    """Used by tests: every catalog ride, stall, and scenery has a drawing path."""
     missing = []
-    dummy_lay = layout_for(8, 8, hud=False)
+    dummy_lay = layout_for(12, 12, hud=False)
     im = Image.new("RGBA", (dummy_lay.width, dummy_lay.height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(im)
     for spec in RIDES.values():
@@ -943,4 +1202,14 @@ def ensure_all_painters_registered() -> list[str]:
             paint_stall(draw, stall, dummy_lay)
         except Exception as exc:  # noqa: BLE001
             missing.append(f"{spec.id}: {exc}")
+    for spec in SCENERY.values():
+        try:
+            paint_scenery(draw, 2, 2, spec.id, dummy_lay)
+        except Exception as exc:  # noqa: BLE001
+            missing.append(f"{spec.id}: {exc}")
+    for surface in TERRAIN_PALETTE:
+        try:
+            paint_tile(draw, 3, 3, "empty", True, 0, 0, dummy_lay, surface=surface)
+        except Exception as exc:  # noqa: BLE001
+            missing.append(f"terrain:{surface}: {exc}")
     return missing

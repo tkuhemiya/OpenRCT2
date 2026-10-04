@@ -36,8 +36,8 @@ class PainterCoverageTests(unittest.TestCase):
     def test_every_ride_and_stall_paints(self) -> None:
         missing = ensure_all_painters_registered()
         self.assertEqual(missing, [], msg=missing)
-        self.assertGreaterEqual(len(RIDES), 20)
-        self.assertGreaterEqual(len(STALLS), 8)
+        self.assertGreaterEqual(len(RIDES), 70)
+        self.assertGreaterEqual(len(STALLS), 30)
 
 
 class IsoMathTests(unittest.TestCase):
@@ -120,7 +120,7 @@ class AgentVisualTests(unittest.TestCase):
 
     def test_open_park_caption(self) -> None:
         self.assertEqual(caption_for("set_park_open:true"), "Opening the gates!")
-        self.assertEqual(sfx_for_action("place_path:1,1"), "place")
+        self.assertEqual(sfx_for_action("place_path:1,1"), "place_item")
 
     def test_heuristic_playthrough_rebuilds_the_park(self) -> None:
         """Gentle Glen seed 11: every build/open/wait changes the camera at tick 0."""

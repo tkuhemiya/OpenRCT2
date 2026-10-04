@@ -6,9 +6,12 @@ Human-playable isometric park on the existing engine. Catalog objects are
 **drawn in code** (`openrct2_agent/art.py`) instead of per-object PNGs.
 Sounds are synthesized (`audio.py`). Open `http://127.0.0.1:8765/play`.
 
-Tests: `python3 -m unittest discover -s agent/tests -v` → **73/73 OK**
-(includes click-to-build, painter coverage, and a full heuristic playthrough
-that hashes the isometric camera at a **fixed tick** after every action).
+Catalog now covers **vanilla RCT2**: every Ride.h attraction (slots 0–90,
+skipping unused/alt), every sellable ShopItem stall, scenery groups, terrain
+surfaces, weather, path types, ride music, staff costumes, and synthesized
+`SoundId` cues. Painters and `/play` lists are generated from that catalog.
+
+Tests: `python3 -m unittest discover -s agent/tests -v` → **83/83 OK**.
 
 **Agent camera check (Gentle Glen seed 11):** 72 heuristic steps, SUCCESS,
 121 guests, rating 771. 71/72 actions changed the PNG at tick 0 (the leftover

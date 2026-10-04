@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .catalog import MONTH_COUNT, MONTHS, RIDES, STALLS
+from .catalog import MONTH_COUNT, MONTHS, RIDES, SCENERY, STALLS
 from .engine import GameState, money_str, path_reachable, rating_str
 
 
@@ -102,17 +102,8 @@ def _glyph(state: GameState, x: int, y: int) -> str:
         return "~"
     if t.kind == "scenery" or t.tree:
         sid = t.scenery_id or "tree"
-        if sid == "tree":
-            return "^"
-        if sid == "garden":
-            return "*"
-        if sid == "bench":
-            return "h"
-        if sid == "lamp":
-            return "!"
-        if sid == "bin":
-            return "o"
-        return "*"
+        spec = SCENERY.get(sid)
+        return spec.symbol if spec else "^"
     return "." if t.owned else ","
 
 

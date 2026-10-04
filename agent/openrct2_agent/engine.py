@@ -56,6 +56,8 @@ class Tile:
     ride_id: Optional[int] = None
     stall_id: Optional[int] = None
     tree: bool = False
+    surface: str = "grass"
+    path_style: str = "crazy"
 
 
 @dataclass
@@ -247,6 +249,8 @@ def new_game(seed: int, scenario: ScenarioSpec, session_id: Optional[str] = None
             owned = margin <= x < w - margin and margin <= y < h - 1
             t.owned = owned
             t.construction_rights = owned
+            t.surface = scenario.terrain
+            t.path_style = scenario.path_type
             # Scatter trees on unowned and a few owned tiles (Forest Frontiers feel).
             if rng.random() < (0.18 if not owned else 0.06):
                 t.tree = True
@@ -257,13 +261,22 @@ def new_game(seed: int, scenario: ScenarioSpec, session_id: Optional[str] = None
                 t.owned = False
                 t.tree = False
                 t.scenery_id = None
+            # Desert / rock parks mix a second surface so the camera matches RCT2 land tools.
+            if scenario.terrain == "sand" and rng.random() < 0.12:
+                t.surface = "sand_brown" if rng.random() < 0.5 else "rock"
+            elif scenario.terrain == "grass" and rng.random() < 0.08:
+                t.surface = "dirt" if rng.random() < 0.6 else "grass_clumps"
 
     # Park entrance + a short welcome path.
-    tiles[entrance_y][entrance_x] = Tile(kind="entrance", owned=True, construction_rights=True)
+    tiles[entrance_y][entrance_x] = Tile(
+        kind="entrance", owned=True, construction_rights=True, surface=scenario.terrain, path_style=scenario.path_type
+    )
     for dy in range(1, 4):
         yy = entrance_y - dy
         if 0 <= yy < h:
-            tiles[yy][entrance_x] = Tile(kind="path", owned=True, construction_rights=True)
+            tiles[yy][entrance_x] = Tile(
+                kind="path", owned=True, construction_rights=True, surface=scenario.terrain, path_style=scenario.path_type
+            )
 
     invented = invented_at_start(scenario)
     queue = research_queue(invented)
@@ -536,7 +549,15 @@ def _recalculate(state: GameState) -> None:
             fee_penalty = 40
         elif state.entrance_fee > 2500:
             fee_penalty = 25
-    weather_mod = {"sunny": 10, "cloudy": 0, "rain": -20, "storm": -45}.get(state.weather, 0)
+    weather_mod = {
+        "sunny": 10,
+        "partial": 5,
+        "cloudy": 0,
+        "rain": -20,
+        "heavy_rain": -30,
+        "thunder": -45,
+        "storm": -45,
+    }.get(state.weather, 0)
     campaign_bonus = sum(MARKETING_CAMPAIGNS[c.kind]["guest_bonus"] for c in state.campaigns if c.kind in MARKETING_CAMPAIGNS)
     path_ok = 1 if len(path_reachable(state)) > 3 else 0
     gen = 0
@@ -579,7 +600,7 @@ def _update_warnings(state: GameState, open_rides: list[RideInstance], ride_valu
         w.append("Ride value is low. Build more (or more exciting) attractions.")
     if state.cash < 50_000:
         w.append("Cash is running low. Consider a loan, higher prices, or slower building.")
-    if state.weather in ("rain", "storm") and not any(s.spec_id == "umbrella_stall" for s in state.stalls):
+    if state.weather in ("rain", "heavy_rain", "thunder", "storm") and not any(s.spec_id == "umbrella_stall" for s in state.stalls):
         w.append("It is raining and there is no umbrella stall.")
     broken = [r for r in state.rides if r.downtime >= 60]
     if broken:
@@ -643,14 +664,17 @@ def _simulate_day(state: GameState) -> None:
 def _update_weather(state: GameState) -> None:
     roll = state.rng.randrange(100)
     month = state.month_index
-    # Spring/autumn wetter.
     rain_chance = 18 if month in (0, 1, 6, 7) else 10
-    if roll < 4:
-        state.weather = "storm"
+    if roll < 3:
+        state.weather = "thunder"
+    elif roll < 7:
+        state.weather = "heavy_rain"
     elif roll < rain_chance:
         state.weather = "rain"
-    elif roll < rain_chance + 35:
+    elif roll < rain_chance + 22:
         state.weather = "cloudy"
+    elif roll < rain_chance + 40:
+        state.weather = "partial"
     else:
         state.weather = "sunny"
 
@@ -693,9 +717,9 @@ def _spawn_guests(state: GameState) -> None:
     n = state.guest_generation_probability
     extra = 1 if state.rng.randrange(100) < (n % 3) * 25 else 0
     spawn = max(0, (n * 2) // 3 + extra)
-    if state.weather == "rain":
+    if state.weather in ("rain", "heavy_rain"):
         spawn = max(0, spawn - 1)
-    if state.weather == "storm":
+    if state.weather in ("thunder", "storm"):
         spawn = max(0, spawn // 2)
     reachable = path_reachable(state)
     ex, ey = state.entrance
@@ -752,8 +776,8 @@ def _simulate_guests(state: GameState) -> None:
         g.toilet = min(255, g.toilet + state.rng.randint(6, 14))
         g.energy = max(0, g.energy - state.rng.randint(10, 20))
         g.nausea = max(0, g.nausea - 15)
-        if state.weather in ("rain", "storm") and g.umbrellas <= 0:
-            g.happiness = max(0, g.happiness - (12 if state.weather == "rain" else 22))
+        if state.weather in ("rain", "heavy_rain", "thunder", "storm") and g.umbrellas <= 0:
+            g.happiness = max(0, g.happiness - (12 if state.weather in ("rain", "heavy_rain") else 22))
 
         # Needs
         if g.hunger > 160 and food:
@@ -767,7 +791,7 @@ def _simulate_guests(state: GameState) -> None:
         elif g.nausea > 140 and first_aid:
             g.nausea = 20
             g.happiness = min(255, g.happiness + 8)
-        elif state.weather in ("rain", "storm") and g.umbrellas <= 0 and umbrellas:
+        elif state.weather in ("rain", "heavy_rain", "thunder", "storm") and g.umbrellas <= 0 and umbrellas:
             if _use_stall(state, g, umbrellas):
                 g.umbrellas = 1
         elif g.cash < 80 and cash_machines:
@@ -840,7 +864,7 @@ def _simulate_guests(state: GameState) -> None:
             or g.energy < 20
             or g.cash < 40
             or g.days_in_park >= stay_cap
-            or (state.weather == "storm" and g.umbrellas <= 0 and g.days_in_park >= 1)
+            or (state.weather in ("thunder", "storm", "heavy_rain") and g.umbrellas <= 0 and g.days_in_park >= 1)
         ):
             leaving.append(g)
 
@@ -981,7 +1005,15 @@ def _advance_research(state: GameState) -> None:
         elif unlocked in state.research_queue:
             state.research_queue.remove(unlocked)
         state.research_next = state.research_queue[0] if state.research_queue else None
-        name = RIDES[unlocked].name if unlocked in RIDES else STALLS.get(unlocked, type("T", (), {"name": unlocked})).name
+        name = (
+            RIDES[unlocked].name
+            if unlocked in RIDES
+            else STALLS[unlocked].name
+            if unlocked in STALLS
+            else SCENERY[unlocked].name
+            if unlocked in SCENERY
+            else unlocked
+        )
         logging_util.log_event(
             "game.research",
             session=state.session_id,

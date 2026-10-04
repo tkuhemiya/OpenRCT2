@@ -393,12 +393,14 @@ def act_place_scenery(state: GameState, parsed: dict[str, Any]) -> dict[str, Any
     if t.kind not in ("empty", "scenery"):
         return _fail("occupied", f"Tile is {t.kind}.")
     spec = SCENERY[sid]
+    if sid not in state.invented:
+        return _fail("not_researched", f"{spec.name} has not been invented yet.")
     ok, msg = charge(state, spec.build_cost, why=spec.name)
     if not ok:
         return _fail("no_cash", msg)
     t.kind = "scenery"
     t.scenery_id = sid
-    t.tree = sid == "tree"
+    t.tree = spec.kind == "tree"
     return _ok(f"Placed {spec.name} at ({x},{y}).")
 
 

@@ -148,6 +148,10 @@
         <button id="btnHandy">Hire handyman</button>
         <button id="btnMech">Hire mechanic</button>
       </div>
+      <div class="row">
+        <button id="btnSec">Hire security</button>
+        <button id="btnEnt">Hire entertainer</button>
+      </div>
       <h3>New park</h3>
       <select id="scenario"></select>
       <input id="seed" type="number" value="11" style="width:100%;margin-bottom:6px;padding:6px;">
@@ -311,7 +315,7 @@ function showBuildList() {
   const title = document.getElementById("listTitle");
   if (tool === "ride") {
     title.textContent = "Rides you can build";
-    fillList(el, cat.rides, "id", r => r.name + "  " + r.cost_text);
+    fillList(el, cat.rides, "id", r => r.name + "  " + r.cost_text + "  [" + r.category + "]");
   } else if (tool === "stall") {
     title.textContent = "Stalls & shops";
     fillList(el, cat.stalls, "id", r => r.name + "  " + r.cost_text);
@@ -392,6 +396,8 @@ document.getElementById("btnWait").onclick = () => stepAction("wait:1");
 document.getElementById("btnWeek").onclick = () => stepAction("wait_days:7");
 document.getElementById("btnHandy").onclick = () => stepAction("hire_staff:handyman");
 document.getElementById("btnMech").onclick = () => stepAction("hire_staff:mechanic");
+document.getElementById("btnSec").onclick = () => stepAction("hire_staff:security");
+document.getElementById("btnEnt").onclick = () => stepAction("hire_staff:entertainer");
 document.getElementById("btnNew").onclick = () => boot();
 document.getElementById("btnOpenRide").onclick = () => {
   const id = document.getElementById("builtList").dataset.ride;

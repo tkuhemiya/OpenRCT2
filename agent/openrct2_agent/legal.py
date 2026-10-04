@@ -204,7 +204,9 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
             )
 
     for spec in SCENERY.values():
-        for x, y in empty_owned[:20]:
+        if spec.id not in state.invented:
+            continue
+        for x, y in empty_owned[:8]:
             actions.append(
                 {
                     "id": f"place_scenery:{spec.id},{x},{y}",
