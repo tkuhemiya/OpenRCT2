@@ -167,11 +167,11 @@ PYTHONPATH=agent python3 agent/scripts/render_replay.py logs/replay.json \
 ```
 
 The **agent never sees images**. The MP4 is a human-facing capture of the text
-HUD/map over time.
+HUD/map over time (Pillow + a system monospace font, then ffmpeg). There is no
+live OpenRCT2 window in this environment.
 
-A recorded win (Gentle Glen, seed 11): `logs/agent_play.mp4` after you run the
-commands above. The same file is copied to the cloud-agent artifacts folder
-when produced in this environment.
+A recorded win (Gentle Glen, seed 11) is committed at
+**`recordings/agent_play.mp4`**. How to watch: `WATCH.md`.
 
 ## Tests
 
@@ -185,6 +185,8 @@ PYTHONPATH=agent python3 agent/scripts/brute_force.py --games 40 --heuristic 8
 ```
 agent/openrct2_agent/   # engine, actions, renderer, HTTP, stdio
 agent/tests/
-agent/scripts/
+agent/scripts/          # play_and_record.py, render_replay.py, …
 agent/OPENRCT2_HOOK.md  # mapping onto live OpenRCT2
+recordings/             # committed agent-play MP4 + transcript
+WATCH.md                # how to watch the recording
 ```

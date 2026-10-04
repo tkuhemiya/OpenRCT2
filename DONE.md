@@ -66,15 +66,16 @@ See `BUGS.md`. B1–B12 all **fixed**. No open blockers.
 
 ## Video / replay
 
-The agent itself never sees images. Human capture:
+The agent itself never sees images. There is no live OpenRCT2 GUI here (no
+RCT2 assets). Human capture is a HUD/map replay:
 
-- `logs/agent_play.mp4` — ffmpeg render of the text HUD/map (Gentle Glen seed 11, a win)
-- `logs/agent_play_transcript.txt` — step-by-step text
-- `logs/replay.json` — machine replay
+- **`recordings/agent_play.mp4`** — watch this (Gentle Glen seed 11, a win, ~18s)
+- `recordings/agent_play_transcript.txt` — step-by-step ASCII
+- `recordings/replay.json` — machine replay
+- `WATCH.md` — how to watch / regenerate
 - copies: `/opt/cursor/artifacts/agent_play.mp4`
 
-Regenerate with the commands in `agent/README.md`. There is no live OpenRCT2
-GUI in this environment (no RCT2 assets).
+Regenerate with the commands in `agent/README.md` / `WATCH.md`.
 
 ## PR
 

@@ -2,7 +2,30 @@
 
 ## Current phase
 
-Phase 3c edge + stronger-model round complete. B12 HUD/legal clarity fixed and retested.
+Phase 4 recording is on disk. Watch path recorded below.
+
+## Recording (this turn)
+
+Live OpenRCT2 GUI capture is not possible (no RCT2 assets). Substitution:
+
+**Watch this:** `recordings/agent_play.mp4`
+
+| Artifact | Path |
+|---|---|
+| MP4 (~18s, 4 fps, 72 HUD frames, 976×1598 h264) | `recordings/agent_play.mp4` |
+| Step-by-step ASCII transcript | `recordings/agent_play_transcript.txt` |
+| Machine replay JSON | `recordings/replay.json` |
+| Start / end stills | `recordings/agent_play_start.png`, `recordings/agent_play_end.png` |
+| How to watch / regenerate | `WATCH.md` |
+| Render script | `agent/scripts/render_replay.py` |
+| Play script | `agent/scripts/play_and_record.py` |
+| Cloud copies | `/opt/cursor/artifacts/agent_play.mp4` |
+
+Playthrough: heuristic on **Gentle Glen** (`gentle_intro`) seed **11** — **SUCCESS**, 121 guests, rating 771 (needed 80 / 600) in 72 steps.
+
+How to watch: `vlc recordings/agent_play.mp4` or `less recordings/agent_play_transcript.txt`.
+
+`logs/agent_play.mp4` is the gitignored working copy (`logs/*.mp4` is ignored); `recordings/` is committed.
 
 ## Completed
 
@@ -11,7 +34,7 @@ Phase 3c edge + stronger-model round complete. B12 HUD/legal clarity fixed and r
 - Phase 3b: Volume brute-force + 6 Composer 2.5 full games. **0 crashes**.
 - Phase 3c: Grok 4.6 Medium g81/g82/g83 all **success**. Text judged playable (4/5); B12 fixed.
 - Phase 3d: B1–B12 fixed and retested.
-- Phase 4: `logs/agent_play.mp4` + transcript + render script.
+- Phase 4: `recordings/agent_play.mp4` + transcript + render script + `WATCH.md`.
 - Phase 5: PR on fork https://github.com/tkuhemiya/OpenRCT2/pull/1
 
 ## This edge + Grok round
@@ -36,7 +59,7 @@ Objective names the last month; map has a tens ruler; warnings no longer print `
 
 ## Next step
 
-Queued follow-ups: video, README polish, PR, DONE, synopsis.
+Queued follow-ups: README polish, PR confirm, DONE, synopsis.
 
 ## Open bugs
 
@@ -46,3 +69,4 @@ None unfixed.
 
 1–17 as before.
 18. Stronger-model HUD complaints that did not block wins still got fixed (B12) so the next agent is less likely to place isolated buildings or miss umbrella stalls.
+19. No live RCT2 window here; the human recording is a Pillow/ffmpeg HUD replay committed under `recordings/` (not gitignored `logs/`).
