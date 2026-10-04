@@ -9,6 +9,7 @@ from typing import Any
 
 from . import logging_util
 from .api import AgentAPI, dumps
+from .persist import load_session, save_session
 
 
 def _print(obj: Any) -> None:
@@ -66,13 +67,13 @@ def main(argv: list[str] | None = None) -> None:
 
         serve(args.host, args.port)
         return
-    api = AgentAPI()
+    session = load_session(args.session)
     if args.cmd == "reset":
-        out = api.reset(args.seed, args.scenario, args.session)
+        out = session.reset(args.seed, args.scenario)
     elif args.cmd in ("state", "get_state"):
-        out = api.get_state(args.session)
+        out = session.get_state()
     elif args.cmd in ("legal", "list_legal_actions"):
-        out = api.list_legal_actions(args.session)
+        out = session.list_legal_actions()
     elif args.cmd == "step":
         if not args.action:
             _print({"ok": False, "error": "Pass --action", "code": "bad_params"})
@@ -81,10 +82,13 @@ def main(argv: list[str] | None = None) -> None:
             action: Any = json.loads(args.action)
         except json.JSONDecodeError:
             action = args.action
-        out = api.step(action, args.session)
+        out = session.step(action)
+    elif args.cmd == "replay":
+        out = {"ok": True, "replay": session.export_replay()}
     else:
         _print({"ok": False, "error": f"Unknown cmd {args.cmd}", "code": "unknown_cmd"})
         return
+    save_session(session)
     if args.text and isinstance(out, dict) and "text" in out:
         sys.stdout.write(out["text"] + "\n")
         return

@@ -6,40 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import pickle
 import sys
-from pathlib import Path
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from openrct2_agent.api import ParkSession
 from openrct2_agent import logging_util
-
-
-def _dir() -> Path:
-    d = Path("logs") / "sessions"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
-def _path(sid: str) -> Path:
-    safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in sid)
-    return _dir() / f"{safe}.pkl"
-
-
-def load(sid: str) -> ParkSession:
-    p = _path(sid)
-    if not p.exists():
-        return ParkSession(sid)
-    with p.open("rb") as f:
-        return pickle.load(f)
-
-
-def save(session: ParkSession) -> None:
-    with _path(session.session_id).open("wb") as f:
-        pickle.dump(session, f)
+from openrct2_agent.persist import load_session, save_session
 
 
 def main() -> None:
@@ -52,7 +26,7 @@ def main() -> None:
     p.add_argument("--action", default=None)
     p.add_argument("--text", action="store_true")
     args = p.parse_args()
-    session = load(args.session)
+    session = load_session(args.session)
     if args.cmd == "reset":
         out = session.reset(args.seed, args.scenario)
     elif args.cmd == "state":
@@ -70,7 +44,7 @@ def main() -> None:
         out = session.step(action)
     else:
         out = {"ok": True, "replay": session.export_replay()}
-    save(session)
+    save_session(session)
     if args.text and "text" in out:
         # Keep legal lists usable: print text plus a compact action sample.
         sys.stdout.write(out["text"] + "\n")

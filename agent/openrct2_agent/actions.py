@@ -602,8 +602,14 @@ def act_set_park_name(state: GameState, parsed: dict[str, Any]) -> dict[str, Any
     return _ok(f"Park renamed to {name!r}.")
 
 
+def _positive_int(parsed: dict[str, Any], key: str, default: int) -> int:
+    if key not in parsed or parsed[key] is None or parsed[key] == "":
+        return default
+    return int(parsed[key])
+
+
 def act_wait(state: GameState, parsed: dict[str, Any]) -> dict[str, Any]:
-    months = int(parsed.get("months") or 1)
+    months = _positive_int(parsed, "months", 1)
     if months < 1 or months > 16:
         return _fail("bad_params", "wait months must be 1–16.")
     before = (state.months_elapsed, state.num_guests, state.cash, state.rating)
@@ -617,7 +623,7 @@ def act_wait(state: GameState, parsed: dict[str, Any]) -> dict[str, Any]:
 
 
 def act_wait_days(state: GameState, parsed: dict[str, Any]) -> dict[str, Any]:
-    days = int(parsed.get("days") or 1)
+    days = _positive_int(parsed, "days", 1)
     if days < 1 or days > 62:
         return _fail("bad_params", "wait_days must be 1–62.")
     simulate_days(state, days)
@@ -625,7 +631,7 @@ def act_wait_days(state: GameState, parsed: dict[str, Any]) -> dict[str, Any]:
 
 
 def act_wait_weeks(state: GameState, parsed: dict[str, Any]) -> dict[str, Any]:
-    weeks = int(parsed.get("weeks") or 1)
+    weeks = _positive_int(parsed, "weeks", 1)
     if weeks < 1 or weeks > 16:
         return _fail("bad_params", "wait_weeks must be 1–16.")
     simulate_days(state, weeks * 7)

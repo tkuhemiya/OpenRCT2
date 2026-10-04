@@ -47,6 +47,7 @@ def render_text(state: GameState) -> str:
         *("  - " + n.text for n in state.news[-8:]),
         "",
         "Warnings / coach notes:",
+        "  TIP: Rides and stalls only work if they TOUCH a # path connected to E. Isolated buildings are useless.",
         *(("  ! " + w) for w in (state.warnings or ["(none)"])),
         "",
         f"Map {state.map_w}x{state.map_h}  (x grows east, y grows south; entrance at {state.entrance})",

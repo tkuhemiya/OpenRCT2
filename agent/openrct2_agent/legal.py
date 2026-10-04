@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from .catalog import MARKETING_CAMPAIGNS, RESEARCH_FUNDING, RIDES, SCENERY, STAFF_HIRE_COST, STALLS
-from .engine import GameState, footprint_ok, money_str, neighbors, path_reachable
+from .engine import (
+    GameState,
+    adjacent_to_reachable_path,
+    footprint_ok,
+    money_str,
+    neighbors,
+    path_reachable,
+)
 
 
 def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict[str, Any]:
@@ -45,10 +52,17 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
     def _near(p: list[int]) -> int:
         return abs(p[0] - state.entrance[0]) + abs(p[1] - state.entrance[1])
 
-    path_tiles.sort(key=_near)
+    reachable = path_reachable(state)
+
+    def _path_rank(p: list[int]) -> tuple[int, int]:
+        x, y = p
+        adj = any((nx, ny) in reachable for nx, ny in neighbors(x, y))
+        return (0 if adj else 1, _near(p))
+
+    path_tiles.sort(key=_path_rank)
     remove_tiles.sort(key=_near)
     buy_tiles.sort(key=_near)
-    empty_owned.sort(key=_near)
+    empty_owned.sort(key=_path_rank)
     for x, y in path_tiles:
         actions.append(
             {
@@ -94,6 +108,12 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
                     ok, _ = footprint_ok(state, x, y, w, h)
                     if ok:
                         origins.append([x, y])
+            origins.sort(
+                key=lambda p, ww=spec.footprint[0], hh=spec.footprint[1]: (
+                    0 if adjacent_to_reachable_path(state, p[0], p[1], ww, hh, reachable) else 1,
+                    abs(p[0] - state.entrance[0]) + abs(p[1] - state.entrance[1]),
+                )
+            )
         ride_origins[spec.id] = origins
         # Cap per-ride origin listing in the flat list to keep it usable.
         for x, y in origins[:40]:
@@ -120,7 +140,12 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
                 ok, _ = footprint_ok(state, x, y, w, h)
                 if ok:
                     origins.append([x, y])
-        origins.sort(key=lambda p: abs(p[0] - state.entrance[0]) + abs(p[1] - state.entrance[1]))
+        origins.sort(
+            key=lambda p, ww=spec.footprint[0], hh=spec.footprint[1]: (
+                0 if adjacent_to_reachable_path(state, p[0], p[1], ww, hh, reachable) else 1,
+                abs(p[0] - state.entrance[0]) + abs(p[1] - state.entrance[1]),
+            )
+        )
         stall_origins[spec.id] = origins
         for x, y in origins[:30]:
             actions.append(
@@ -291,17 +316,17 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
         # Keep all non-tile actions; trim place_* origins already capped per type.
         pass
 
-    reachable = path_reachable(state)
     text_lines = [
-        f"{len(actions)} legal actions. Prefer building paths from the entrance {state.entrance},",
-        "then stalls (toilets, drinks, food), then rides, hire handyman+mechanic, OPEN the park, wait.",
-        f"Path tiles you can pave: {len(path_tiles)} (ids place_path:x,y).",
+        f"{len(actions)} legal actions. Build a connected # path from the entrance {state.entrance} FIRST.",
+        "Place toilets/drinks/food and rides so they TOUCH a reachable # path, then hire handyman+mechanic, OPEN the park, wait.",
+        "If you place a building on grass with no adjacent #, guests cannot use it (rating will collapse).",
+        f"Path tiles you can pave (nearest-to-entrance first): {len(path_tiles)} (ids place_path:x,y).",
         f"Buyable land plots: {len(buy_tiles)}.",
         f"Invented rides: {', '.join(s.id for s in invented_rides)}.",
         f"Invented stalls: {', '.join(s.id for s in invented_stalls)}.",
         f"Entrance path connectivity: {len(reachable)} tiles.",
         "You may also pass JSON: {\"type\":\"place_ride\",\"ride_type\":\"merry_go_round\",\"x\":7,\"y\":10}.",
-        "Any invented ride may be placed at ANY origin in ride_origins even if the flat list was truncated.",
+        "Suggested ride/stall origins in the flat list are already sorted: path-adjacent first.",
     ]
     action_types = [
         {

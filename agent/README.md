@@ -99,8 +99,44 @@ You may also pass a JSON object: `{"type":"wait","months":1}`.
 6. `wait:1` to simulate a month.
 7. Expand with more rides as cash and research allow.
 
-Money is integer **pence** (`1000` = £10.00). The calendar is RCT’s 8-month year
-(March–October), matching OpenRCT2 `Date.h`.
+## Example agent loop
+
+```python
+from openrct2_agent.api import ParkSession
+
+s = ParkSession()
+s.reset(seed=42, scenario="gentle_intro")
+while True:
+    snap = s.get_state()
+    print(snap["text"])
+    if snap["game_over"]:
+        print("RESULT", snap["result"], snap["result_reason"])
+        break
+    legal = s.list_legal_actions()
+    # Pick an id from legal["actions_flat"], or a JSON object:
+    action = "wait:1"  # replace with your policy
+    result = s.step(action)
+    if not result["ok"]:
+        print("illegal:", result["error"])  # never a crash
+```
+
+One-shot CLI commands **persist** under `logs/sessions/<session>.pkl` (default session `default`):
+
+```bash
+export PYTHONPATH=agent
+python3 -m openrct2_agent.cli reset --seed 42 --scenario gentle_intro --session demo --text
+python3 -m openrct2_agent.cli step --session demo --action place_path:8,14
+python3 -m openrct2_agent.cli state --session demo --text
+```
+
+## Known limitations
+
+- Original RCT2 data files are **not** bundled. This is a source-faithful Python sim, not a running `openrct2` process. See `OPENRCT2_HOOK.md`.
+- Map is 18×16 so the whole park fits in text. Not a 128×128 RCT2 map.
+- Rides are **complete prebuilt layouts**, not piece-by-piece track.
+- Buildings must touch a `#` path connected to `E` or guests cannot use them.
+- `list_legal_actions` can list hundreds of tile origins; the flat list is sorted (path-adjacent, near the entrance first) and truncated per type.
+- Money is integer pence. Dates use RCT’s 8-month year (March–October).
 
 ## Logging and replay
 
