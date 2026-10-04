@@ -15,6 +15,7 @@ Bugs found while building and testing the OpenRCT2 text agent API.
 | B9 | One-shot CLI `reset` then `step` started a fresh in-memory game | Each process constructed a new `AgentAPI()`. | **Fixed** (pickle persist under `logs/sessions/`). |
 | B10 | `dynamite_dunes` unwinnable: heuristic 0/6 and Composer 2.5 peaked at ~£13k vs £25k | Park-value formula (`build/4 + E*80 + guests*700`) is full-map RCT scale; 18×16 parks never reach £25,000. | **Fixed**. Value uses construction cost + excitement×350 + £40/guest. Heuristic also builds coasters on `park_value_by`. Re-run: **8/8** heuristic wins. |
 | B11 | Winning `wait:1` skipped month-end JSONL (`game.month` missing) and left `months_elapsed=0` | Objective is checked every day; a mid-month win returned before `_end_of_month`. | **Fixed**. Calendar always finishes the requested wait; `game.month` + `game.wait` log even after a mid-month result. |
+| B12 | Stronger model (Grok 4.6 Medium) scored HUD clarity 4/5: `! (none)` looked like a warning; map x-axis wrapped 0–9; invented stall ids vanished from a truncated legal list; objective said “the deadline” without naming June/Year 2 | Renderer placeholders + `str(x % 10)` header + global tile-id cap filling with paths/rides first | **Fixed**. WARN lines; tens+ones map ruler; objective names the last month; invented `Name [id]`; truncate round-robin keeps ≥1 origin per type. |
 
 ## Brute-force round 2 (this e2e pass)
 
@@ -57,6 +58,9 @@ Sessions from Composer 2.5 (`c31`,`c32`,`c33`,`c41`) and Grok 4.6 Medium (`g61`,
 | bf-c54 | Composer 2.5 | forest_frontiers seed 54 | **success** | 306 | 766 | Path warnings on later rides; guests/rating still hit. |
 | bf-c55 | Composer 2.5 | forest_frontiers seed 55 | **success** | 310 | 741 | Same pattern. |
 | bf-c56 | Composer 2.5 | dynamite_dunes seed 56 | **failure** | 361 | 999 | Park value £12.8k / £25k — B10, since fixed. |
+| g81 | Grok 4.6 Medium | gentle_intro seed 81 | **success** | 91 | 737 | HUD-driven; 0 invalid. Clarity 4/5 (B12). |
+| g82 | Grok 4.6 Medium | forest_frontiers seed 82 | **success** | 302 | 750 | HUD-driven; 0 invalid. Clarity 4/5 (B12). |
+| g83 | Grok 4.6 Medium | dynamite_dunes seed 83 | **success** | 79 | 849 | Park value £26.5k. Clarity 4/5 (B12). |
 
 Crashes: **none**. Hangs: **none**.
 
@@ -64,6 +68,7 @@ Crashes: **none**. Hangs: **none**.
 
 ## Confusing text (remaining, documented)
 
-- A ride still prints `WARNING: no path from the entrance` after `place_ride` if paths do not touch it — **correct**, not a crash.
+- A ride still prints `WARN: no path from the entrance` after `place_ride` if paths do not touch it — **correct**, not a crash.
+- All rides still render as `R` on the ASCII map; use ride/stall lists + warnings to tell them apart.
 - `legal` JSON can be large; `agent_client.py` truncates stdout. Use `--text` for the summary plus a sample of ids.
 - Guests can enter an open park even when no ride is reachable (they mill around). Rating then collapses unless something is connected. Documented in README.

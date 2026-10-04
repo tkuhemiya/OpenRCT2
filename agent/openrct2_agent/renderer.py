@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from .catalog import MONTH_COUNT, RIDES, STALLS
+from .catalog import MONTH_COUNT, MONTHS, RIDES, STALLS
 from .engine import GameState, money_str, path_reachable, rating_str
 
 
 LEGEND = (
-    "E entrance  # path  R ride  $ stall  T toilets  D drinks  F food  "
-    "I info  + first-aid  ^ tree  ~ water  . owned grass  , unowned  o bin  * garden"
+    "E entrance  # clean path  ; light litter  % dirty path  "
+    "R ride  T toilets  D drinks  F food  I info  + first-aid  B balloon  U umbrella  $ other stall  "
+    "^ tree  ~ water  . owned grass  , unowned  o bin  * garden  h bench"
 )
 
 
@@ -17,11 +18,22 @@ def render_text(state: GameState) -> str:
     deadline = obj.get("month_deadline", obj.get("year", 1) * MONTH_COUNT)
     remaining = max(0, deadline - state.months_elapsed)
     obj_line = _objective_line(state)
+    date_line = (
+        f"Date: {state.day} {state.month_name}, Year {state.year}   "
+        + (
+            f"(GAME OVER — {state.result}; this is the finish date, not a live deadline)"
+            if state.result != "undecided"
+            else (
+                f"(month {state.months_elapsed + 1}/{deadline or '?'} of scenario, "
+                f"{remaining} months left; last scoring month is {_deadline_name(deadline)})"
+            )
+        )
+    )
+    warn_lines = [f"  WARN: {w}" for w in state.warnings] if state.warnings else ["  (none)"]
     lines = [
         "=== OpenRCT2 agent state (text only) ===",
         f"Scenario: {state.park_name} ({state.scenario_id})   seed={state.seed}",
-        f"Date: {state.day} {state.month_name}, Year {state.year}   "
-        f"(month {state.months_elapsed + 1}/{deadline or '?'} of scenario, {remaining} months left)",
+        date_line,
         f"Status: {state.result.upper()}" + (f" — {state.result_reason}" if state.result_reason else ""),
         f"Objective: {obj_line}",
         "",
@@ -48,21 +60,23 @@ def render_text(state: GameState) -> str:
         "",
         "Warnings / coach notes:",
         "  TIP: Rides and stalls only work if they TOUCH a # path connected to E. Isolated buildings are useless.",
-        *(("  ! " + w) for w in (state.warnings or ["(none)"])),
+        "  TIP: E is on the south edge. Pave # NORTH (smaller y). x grows east.",
+        *warn_lines,
         "",
         f"Map {state.map_w}x{state.map_h}  (x grows east, y grows south; entrance at {state.entrance})",
         f"Legend: {LEGEND}",
         *render_map(state),
         "",
-        f"Path tiles reachable from entrance: {len(path_reachable(state))}",
+        f"Walkable from entrance: {len(path_reachable(state))} tiles (includes E plus connected # paths).",
         _guest_sample(state),
     ]
     return "\n".join(lines)
 
 
 def render_map(state: GameState) -> list[str]:
-    header = "y\\x " + "".join(str(x % 10) for x in range(state.map_w))
-    rows = [header]
+    tens = "    " + "".join(str(x // 10) for x in range(state.map_w))
+    ones = "y\\x " + "".join(str(x % 10) for x in range(state.map_w))
+    rows = [tens, ones]
     for y in range(state.map_h):
         cells = []
         for x in range(state.map_w):
@@ -102,22 +116,38 @@ def _glyph(state: GameState, x: int, y: int) -> str:
     return "." if t.owned else ","
 
 
+def _deadline_name(deadline: int) -> str:
+    if not deadline:
+        return "the time cap"
+    idx = (deadline - 1) % MONTH_COUNT
+    year = (deadline - 1) // MONTH_COUNT + 1
+    return f"{MONTHS[idx]} Year {year}"
+
+
 def _objective_line(state: GameState) -> str:
     obj = state.objective
     typ = obj.get("type")
+    deadline = obj.get("month_deadline", obj.get("year", 1) * MONTH_COUNT)
+    when = _deadline_name(deadline)
     if typ == "guests_by":
         return (
             f"Attract {obj['num_guests']} guests with rating ≥ {obj['min_rating']} "
-            f"by the deadline (now {state.num_guests} guests, rating {state.rating})."
+            f"by the end of {when} (now {state.num_guests} guests, rating {state.rating})."
         )
     if typ == "park_value_by":
-        return f"Reach park value {money_str(obj['currency'])} (now {money_str(state.park_value)})."
+        gap = max(0, obj["currency"] - state.park_value)
+        return (
+            f"Reach park value {money_str(obj['currency'])} by the end of {when} "
+            f"(now {money_str(state.park_value)}, short {money_str(gap)})."
+        )
     if typ == "have_fun":
-        return "Have fun (sandbox). Avoid bankruptcy until the time cap."
+        return f"Have fun (sandbox). Avoid bankruptcy until {when}."
     if typ == "guests_and_rating":
-        return f"Maintain {obj['num_guests']} guests and rating ≥ 700."
+        return f"Maintain {obj['num_guests']} guests and rating ≥ 700 by {when}."
     if typ == "repay_loan_and_park_value":
-        return f"Repay the loan and reach park value {money_str(obj['currency'])}."
+        return (
+            f"Repay the loan and reach park value {money_str(obj.get('currency', 0))} by {when}."
+        )
     return str(obj)
 
 
@@ -169,8 +199,8 @@ def _staff_block(state: GameState) -> str:
 def _research_block(state: GameState) -> str:
     nxt = state.research_next
     nxt_name = RIDES[nxt].name if nxt in RIDES else (STALLS[nxt].name if nxt in STALLS else nxt)
-    invented_rides = [RIDES[i].name for i in sorted(state.invented) if i in RIDES]
-    invented_stalls = [STALLS[i].name for i in sorted(state.invented) if i in STALLS]
+    invented_rides = [f"{RIDES[i].name} [{i}]" for i in sorted(state.invented) if i in RIDES]
+    invented_stalls = [f"{STALLS[i].name} [{i}]" for i in sorted(state.invented) if i in STALLS]
     return (
         f"Research: funding={state.research_funding}  progress={state.research_progress}/100  "
         f"next={nxt_name}\n"

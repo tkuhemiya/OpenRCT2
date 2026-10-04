@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from typing import Any
 
 from .catalog import MARKETING_CAMPAIGNS, RESEARCH_FUNDING, RIDES, SCENERY, STAFF_HIRE_COST, STALLS
@@ -13,6 +14,39 @@ from .engine import (
     neighbors,
     path_reachable,
 )
+
+
+def _tile_group_key(action: dict[str, Any]) -> str:
+    aid = str(action.get("id", action.get("type")))
+    typ = action.get("type")
+    if typ in ("place_ride", "place_stall", "place_scenery"):
+        return aid.rsplit(",", 2)[0]
+    return str(typ)
+
+
+def _trim_tile_actions(tile: list[dict[str, Any]], budget: int) -> list[dict[str, Any]]:
+    """Keep path-adjacent-first order inside each type, but reserve ≥1 origin per group."""
+    if len(tile) <= budget:
+        return tile
+    groups: dict[str, deque] = defaultdict(deque)
+    order: list[str] = []
+    for a in tile:
+        key = _tile_group_key(a)
+        if key not in groups:
+            order.append(key)
+        groups[key].append(a)
+    out: list[dict[str, Any]] = []
+    for key in order:
+        if groups[key] and len(out) < budget:
+            out.append(groups[key].popleft())
+    progressed = True
+    while len(out) < budget and progressed:
+        progressed = False
+        for key in order:
+            if groups[key] and len(out) < budget:
+                out.append(groups[key].popleft())
+                progressed = True
+    return out
 
 
 def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict[str, Any]:
@@ -337,7 +371,7 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
     budget = max(0, max_tile_actions - len(core))
     truncated = len(tile) > budget
     if truncated:
-        tile = tile[:budget]
+        tile = _trim_tile_actions(tile, budget)
     actions = tile + core
 
     text_lines = [
@@ -348,14 +382,15 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
         f"Buyable land plots: {len(buy_tiles)}.",
         f"Invented rides: {', '.join(s.id for s in invented_rides)}.",
         f"Invented stalls: {', '.join(s.id for s in invented_stalls)}.",
-        f"Entrance path connectivity: {len(reachable)} tiles.",
-        "You may also pass JSON: {\"type\":\"place_ride\",\"ride_type\":\"merry_go_round\",\"x\":7,\"y\":10}.",
-        "Suggested ride/stall origins in the flat list are already sorted: path-adjacent first.",
+        f"Walkable tiles from E (includes the entrance plus #): {len(reachable)}.",
+        "You may also pass JSON: {\"type\":\"place_ride\",\"ride_type\":\"merry_go_round\",\"x\":7,\"y\":10} "
+        "(or just use the id strings below).",
+        "Suggested ride/stall origins in the flat list are sorted path-adjacent first; later ids of the same type may NOT touch a path.",
     ]
     if truncated:
         text_lines.append(
-            f"Tile-placement ids were truncated to keep the list usable "
-            f"(cap {max_tile_actions}; {len(core)} management actions always kept)."
+            f"Tile-placement ids were truncated (cap {max_tile_actions}; {len(core)} management actions kept). "
+            "At least one origin per invented ride/stall type is reserved."
         )
     action_types = [
         {

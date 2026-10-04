@@ -45,9 +45,10 @@ Full usage: `agent/README.md`.
 
 ## Tests
 
-- **49** unittest cases (unit + e2e + edge, including JSONL event kinds, apply_replay, HTTP POST `/state` + `/legal_actions`, Dynamite Dunes win). All passing.
+- **62** unittest cases (unit + e2e + expanded edge: invalid, game-over, rapid reset, long games, odd seeds, malformed HTTP, timeouts). All passing.
 - Heuristic wins `gentle_intro`, `forest_frontiers`, and `dynamite_dunes`.
 - Brute force round 2: **0 crashes**. Heuristic 12/12 intro, 10/10 then 6/6 Forest Frontiers, 8/8 Dynamite Dunes after B10.
+- Grok 4.6 Medium g81/g82/g83: **3/3 success**, HUD clarity 4/5 then B12 text fixes.
 - Edge: malformed input, game-over, rapid resets, odd seeds, isolated HTTP/CLI sessions, `wait:0`.
 
 ## LLM play
@@ -55,13 +56,13 @@ Full usage: `agent/README.md`.
 | Model | Games | Outcome |
 |---|---|---|
 | Composer 2.5 | gentle_intro ×3 + forest ×1 (plus failed retries) | Several wins; failed when buildings were placed far from the entrance path (B7, since fixed) |
-| Grok 4.6 Medium | gentle_intro + forest_frontiers | Both **success**, connected parks, text judged clear enough |
+| Grok 4.6 Medium | g61, g71, then g81/g82/g83 | **5/5 success** this campaign; g81–g83 HUD-only wins including Dynamite Dunes. Clarity 4/5 → B12 text fixes. |
 
 No agent-loop crashes or hangs.
 
 ## Bugs
 
-See `BUGS.md`. B1–B11 all **fixed**. No open blockers.
+See `BUGS.md`. B1–B12 all **fixed**. No open blockers.
 
 ## Video / replay
 
