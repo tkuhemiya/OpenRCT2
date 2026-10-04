@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Record a *gameplay* video of the heuristic agent using generated sprites.
+"""Record a gameplay video of the heuristic agent using the isometric camera.
 
-This is a top-down park camera, not the ASCII/terminal HUD dump.
-The agent loop itself remains text-only.
+The park is drawn in code (openrct2_agent.art). The agent loop stays text-only.
 """
 
 from __future__ import annotations
@@ -28,7 +27,11 @@ import random
 SCRIPTS = os.path.join(ROOT, "scripts")
 if SCRIPTS not in sys.path:
     sys.path.insert(0, SCRIPTS)
-from pack_assets import SPRITE_DIR, pack
+try:
+    from pack_assets import SPRITE_DIR, pack
+except Exception:  # noqa: BLE001
+    SPRITE_DIR = None
+    pack = None
 
 
 def _highlight_for(action: str):
@@ -54,8 +57,11 @@ def main() -> None:
     p.add_argument("--fps", type=int, default=10)
     args = p.parse_args()
 
-    if not (SPRITE_DIR / "grass.png").exists():
-        pack()
+    if SPRITE_DIR is not None and pack is not None and not (SPRITE_DIR / "grass.png").exists():
+        try:
+            pack()
+        except Exception:
+            pass
 
     logging_util.configure()
     session = ParkSession("gameplay")

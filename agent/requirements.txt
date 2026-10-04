@@ -1,6 +1,6 @@
 # Agent API: Python 3.10+ standard library only. No pip packages required
 # for reset / get_state / list_legal_actions / step / tests.
 #
-# Optional, only for recordings (HUD replay + gameplay camera):
+# Optional, only for recordings and the human /play client:
 #   Pillow
 # ffmpeg is a system binary, not a pip package.

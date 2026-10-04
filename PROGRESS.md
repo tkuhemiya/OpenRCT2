@@ -2,11 +2,20 @@
 
 ## Current phase
 
+Human-playable isometric park on the existing engine. Catalog objects are
+**drawn in code** (`openrct2_agent/art.py`) instead of per-object PNGs.
+Sounds are synthesized (`audio.py`). Open `http://127.0.0.1:8765/play`.
+
+Tests: `python3 -m unittest discover -s agent/tests -v` → **71/71 OK**
+(includes click-to-build, painter coverage, agent-step pixel change).
+
+## Original brief
+
 **All PLAN phases 0–5 complete.** Final verification passed. See `DONE.md`.
 
 Verified just now:
 
-- Tests: `python3 -m unittest discover -s agent/tests -v` → **62/62 OK** (8.465s)
+- Tests: `python3 -m unittest discover -s agent/tests -v` → **71/71 OK**
 - `BUGS.md`: B1–B12 **Fixed**; no unfixed bugs
 - Recording: `recordings/agent_play_gameplay.mp4` (~40s top-down sprites) plus ASCII `recordings/agent_play.mp4`
 - PR: https://github.com/tkuhemiya/OpenRCT2/pull/1 OPEN on **fork only**

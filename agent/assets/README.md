@@ -1,12 +1,13 @@
-# Game sprites (original art)
+# Park art
 
-These are **original** pixel-art tiles and buildings for the Python park
-sim. They are **not** RCT2 data files and are not copied from OpenRCT2.
+The playable camera is **programmatic isometric pixel art**
+(`openrct2_agent/art.py`). Every ride, stall, tile, tree, and peep is drawn
+with ImageDraw from the catalog — adding a ride type does not need a new PNG.
 
-| Folder | What |
-|---|---|
-| `sprites/` | Packed PNGs the camera uses (grass, path, water, trees, rides, stalls, guests) |
-| `../scripts/pack_assets.py` | Crops/keys generated source art into `sprites/` |
-| `../scripts/record_gameplay.py` | Heuristic agent plays; ffmpeg writes a top-down gameplay MP4 |
+Sounds are likewise generated in `openrct2_agent/audio.py` (WAV, no RCT2
+samples).
 
-Watch: `recordings/agent_play_gameplay.mp4`
+`sprites/` may still contain earlier packed images; the live renderer does
+not require them.
+
+Play: `python3 -m openrct2_agent.cli play` then open `/play`.

@@ -1,6 +1,7 @@
-"""HTTP JSON API for the OpenRCT2 agent.
+"""HTTP JSON API for the OpenRCT2 agent, plus the human park client.
 
 Endpoints:
+  GET  /play               Interactive isometric park (human + agent watch)
   POST /reset              JSON {seed, scenario, session_id?}
   GET  /state              ?session_id=
   POST /state              JSON {session_id?}
@@ -23,6 +24,7 @@ from urllib.parse import parse_qs, urlparse
 
 from .api import AgentAPI, dumps
 from . import logging_util
+from . import play as play_http
 
 API = AgentAPI()
 
@@ -51,10 +53,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send(self, code: int, payload: dict[str, Any]) -> None:
         body = dumps(payload).encode("utf-8")
+        self._send_raw(code, body, "application/json; charset=utf-8")
+
+    def _send_raw(self, code: int, body: bytes, content_type: str) -> None:
         self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -87,10 +93,15 @@ class Handler(BaseHTTPRequestHandler):
                         "GET /replay": "?session_id=  (export)",
                         "POST /replay": "{seed, scenario, actions} or {replay}",
                         "POST /rpc": "{cmd, ...}",
+                        "GET /play": "human isometric park client",
                     },
                     "scenarios": ["gentle_intro", "forest_frontiers", "dynamite_dunes", "have_fun"],
                 },
             )
+            return
+        if parsed.path.startswith("/play"):
+            code, ctype, body = play_http.handle_get(parsed.path, qs, API)
+            self._send_raw(code, body, ctype)
             return
         if parsed.path in ("/state", "/get_state"):
             self._send(200, API.get_state(sid))
@@ -129,6 +140,10 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path in ("/rpc", "/dispatch"):
             self._send(200, API.dispatch(body))
             return
+        if parsed.path.startswith("/play"):
+            code, ctype, raw = play_http.handle_post(parsed.path, body, API)
+            self._send_raw(code, raw, ctype)
+            return
         self._send(404, {"ok": False, "error": f"Unknown POST {parsed.path}", "code": "not_found"})
 
 
@@ -137,6 +152,7 @@ def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
     httpd = ThreadingHTTPServer((host, port), Handler)
     logging_util.log_event("http.listen", host=host, port=port, log=str(logging_util.log_path()))
     print(f"OpenRCT2 agent API on http://{host}:{port}  log={logging_util.log_path()}", flush=True)
+    print(f"Play the park:          http://{host}:{port}/play", flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

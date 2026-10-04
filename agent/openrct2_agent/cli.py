@@ -38,7 +38,7 @@ def run_stdio() -> None:
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="OpenRCT2 text agent CLI")
-    p.add_argument("cmd", nargs="?", help="reset|state|legal|step|replay|apply_replay|stdio|serve|help")
+    p.add_argument("cmd", nargs="?", help="reset|state|legal|step|replay|apply_replay|stdio|serve|play|help")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--scenario", default="forest_frontiers")
     p.add_argument("--action", default=None)
@@ -53,6 +53,7 @@ def main(argv: list[str] | None = None) -> None:
             "Usage:\n"
             "  python -m openrct2_agent.cli stdio\n"
             "  python -m openrct2_agent.cli serve --port 8765\n"
+            "  python -m openrct2_agent.cli play --port 8765\n"
             "  python -m openrct2_agent.cli reset --seed 42 --scenario gentle_intro\n"
             "  python -m openrct2_agent.cli state --text\n"
             "  python -m openrct2_agent.cli legal\n"
@@ -64,7 +65,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.cmd == "stdio":
         run_stdio()
         return
-    if args.cmd == "serve":
+    if args.cmd in ("serve", "play"):
         from .server import serve
 
         serve(args.host, args.port)

@@ -13,7 +13,7 @@ OpenRCT2 needs original RCT2 data files, which cannot be bundled. See
 ## Setup
 
 - **Python 3.10+** (stdlib only). No `pip install` for the agent loop or tests.
-- Optional, recordings only: **Pillow** plus **ffmpeg** (used by `render_replay.py`).
+- Optional, human park + recordings: **Pillow** (isometric `/play` camera) and **ffmpeg** (MP4).
 - `agent/requirements.txt` documents that; it does not add runtime packages.
 
 From the **repository root**:
@@ -161,6 +161,27 @@ endpoints. Stdio also accepts `quit` / `exit`.
 | `forest_frontiers` | Forest Frontiers | 250 guests and rating ≥ 600 by end of Year 1 (API default) |
 | `dynamite_dunes` | Dynamite Dunes | Park value £25,000 by end of Year 2 |
 | `have_fun` | Fun Park | Sandbox until bankruptcy or 4 years (park starts open) |
+
+## Play it yourself (human client)
+
+The engine is the same `ParkSession` the agent uses. The park camera is
+**drawn in code** (isometric tiles, rides, stalls, peeps) so every catalog
+object has a silhouette without a pile of PNGs.
+
+```bash
+export PYTHONPATH=agent
+python3 -m openrct2_agent.cli play --port 8765
+# open http://127.0.0.1:8765/play
+```
+
+Click the map to pave paths, pick a ride/stall and click to build, then
+**Open park gates** and **Wait 1 month**. Sounds are generated in code
+(`openrct2_agent.audio`). **Watch manager play** runs the heuristic on this
+same session so you see the isometric park change when the agent acts.
+`POST /step` from any API client updates that view too.
+
+Pillow is required for `/play` and the isometric frames. The text agent
+loop still needs only the stdlib.
 
 ## How to play (for agents)
 

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OpenRCT2 — Park</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --wood: #5a3a1c;
+    --wood2: #7a5228;
+    --panel: #c4a06a;
+    --panel-dark: #8a6840;
+    --gold: #e8c43c;
+    --ink: #1a1208;
+    --cream: #f4ead2;
+    --btn: #d4bc88;
+    --grass: #1a3d14;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(ellipse at top, #245218, var(--grass) 55%);
+    color: var(--ink);
+    font: 13px/1.35 Tahoma, Verdana, Geneva, sans-serif;
+  }
+  .window {
+    margin: 10px auto;
+    max-width: 1280px;
+    background: var(--panel);
+    border: 3px solid #3a2410;
+    box-shadow: inset 2px 2px 0 #ecd8a8, inset -2px -2px 0 #6a4420, 8px 10px 0 #0c1808;
+  }
+  .titlebar {
+    background: linear-gradient(#f3d24a, #c99618);
+    color: var(--ink);
+    font-weight: 700;
+    padding: 6px 10px;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 2px solid #7a5a18;
+    text-shadow: 1px 1px 0 #fff3a8;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    padding: 6px 8px;
+    background: #6a4824;
+    color: var(--cream);
+  }
+  .stats b { color: var(--gold); display: block; font-size: 12px; }
+  .layout { display: grid; grid-template-columns: 168px 1fr 230px; min-height: 560px; }
+  .tools, .side {
+    background: #b08a52;
+    padding: 8px;
+    border-right: 2px solid #6a4420;
+  }
+  .side { border-right: 0; border-left: 2px solid #6a4420; }
+  .tool, button, select {
+    display: block;
+    width: 100%;
+    margin: 0 0 6px;
+    padding: 7px 8px;
+    background: var(--btn);
+    border-top: 2px solid #f0e0b8;
+    border-left: 2px solid #f0e0b8;
+    border-right: 2px solid #6a4a20;
+    border-bottom: 2px solid #6a4a20;
+    color: var(--ink);
+    font: 12px Tahoma, sans-serif;
+    cursor: pointer;
+  }
+  .tool.active, button:active { border-color: #6a4a20 #f0e0b8 #f0e0b8 #6a4a20; background: #c4a86e; }
+  button.gold { background: var(--gold); font-weight: 700; }
+  button.danger { background: #c07048; }
+  .park-wrap {
+    background: #163016;
+    overflow: auto;
+    position: relative;
+    min-height: 520px;
+  }
+  #park {
+    display: block;
+    margin: 0 auto;
+    cursor: crosshair;
+    image-rendering: pixelated;
+    max-width: 100%;
+  }
+  .ghost-label {
+    position: absolute; left: 8px; top: 8px;
+    background: #1a1208cc; color: var(--gold);
+    padding: 4px 8px; pointer-events: none;
+  }
+  h3 { margin: 8px 0 4px; font-size: 12px; color: #3a2410; }
+  .list { max-height: 210px; overflow: auto; background: #ecd8b0; border: 1px solid #6a4420; }
+  .list div {
+    padding: 5px 6px; cursor: pointer; border-bottom: 1px solid #c4a06a;
+  }
+  .list div:hover, .list div.sel { background: #f3d24a; }
+  .muted { color: #5a4030; font-size: 11px; }
+  .foot {
+    display: flex; gap: 8px; align-items: center;
+    padding: 6px 8px; background: #3a2814; color: var(--gold);
+  }
+  .foot .news { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msg { min-height: 16px; padding: 0 8px 6px; color: #3a1808; }
+  .msg.bad { color: #7a1008; font-weight: 700; }
+  .row { display: flex; gap: 6px; }
+  .row > * { flex: 1; }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar">
+    <span id="title">OpenRCT2 — Park Manager</span>
+    <span>Programmatic isometric view · same engine as the agent API</span>
+  </div>
+  <div class="stats">
+    <div>Cash<b id="cash">£0.00</b></div>
+    <div>Guests<b id="guests">0</b></div>
+    <div>Rating<b id="rating">0.00</b></div>
+    <div>Date<b id="date">—</b></div>
+    <div>Weather<b id="weather">—</b></div>
+    <div>Park<b id="pstatus">CLOSED</b></div>
+  </div>
+  <div class="layout">
+    <div class="tools">
+      <h3>Construction</h3>
+      <button class="tool active" data-tool="path">Path</button>
+      <button class="tool" data-tool="ride">Ride</button>
+      <button class="tool" data-tool="stall">Stall / shop</button>
+      <button class="tool" data-tool="scenery">Scenery</button>
+      <button class="tool" data-tool="land">Buy land</button>
+      <button class="tool" data-tool="demolish">Demolish</button>
+      <button class="tool" data-tool="inspect">Inspect</button>
+      <h3>Park</h3>
+      <button class="gold" id="btnOpen">Open park gates</button>
+      <button id="btnWait">Wait 1 month</button>
+      <button id="btnWeek">Wait 1 week</button>
+      <div class="row">
+        <button id="btnHandy">Hire handyman</button>
+        <button id="btnMech">Hire mechanic</button>
+      </div>
+      <h3>New park</h3>
+      <select id="scenario"></select>
+      <input id="seed" type="number" value="11" style="width:100%;margin-bottom:6px;padding:6px;">
+      <button id="btnNew">Start new park</button>
+      <h3>Agent</h3>
+      <button class="gold" id="btnAgent">Manager builds 1 step</button>
+      <button id="btnWatch">Watch manager play</button>
+      <div class="muted" id="agentNote">The text API drives this same park. Watch the isometric view update when the agent acts.</div>
+    </div>
+    <div class="park-wrap">
+      <img id="park" alt="Park camera">
+      <div class="ghost-label" id="hover">Click the park to build</div>
+    </div>
+    <div class="side">
+      <h3 id="listTitle">Rides you can build</h3>
+      <div class="list" id="buildList"></div>
+      <h3>Built rides</h3>
+      <div class="list" id="builtList"></div>
+      <div class="row">
+        <button id="btnOpenRide">Open ride</button>
+        <button class="danger" id="btnCloseRide">Close</button>
+      </div>
+      <h3>Staff on site</h3>
+      <div id="staffLine" class="muted">None yet</div>
+    </div>
+  </div>
+  <div class="msg" id="msg"></div>
+  <div class="foot">
+    <div class="news" id="news">Welcome.</div>
+    <span class="muted" id="obj"></span>
+  </div>
+</div>
+<script>
+const SID = "park";
+let tool = "path";
+let item = "";
+let tick = 0;
+let meta = null;
+let watching = false;
+let watchTimer = null;
+let lastActions = -1;
+const sounds = {};
+
+function playSfx(name) {
+  try {
+    const a = new Audio("/play/sfx/" + name + ".wav");
+    a.volume = 0.45;
+    a.play();
+  } catch (e) {}
+}
+
+async function jget(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+async function jpost(url, body) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+function setMsg(text, bad) {
+  const el = document.getElementById("msg");
+  el.textContent = text || "";
+  el.className = "msg" + (bad ? " bad" : "");
+}
+
+function refreshFrame(caption) {
+  const img = document.getElementById("park");
+  const q = new URLSearchParams({
+    session_id: SID,
+    tick: String(tick++),
+    caption: caption || "",
+    hud: "1"
+  });
+  img.src = "/play/frame.png?" + q.toString();
+}
+
+function fillList(el, rows, key, labelFn) {
+  el.innerHTML = "";
+  rows.forEach(row => {
+    if (row.invented === false) return;
+    const d = document.createElement("div");
+    d.textContent = labelFn(row);
+    d.onclick = () => {
+      [...el.children].forEach(c => c.classList.remove("sel"));
+      d.classList.add("sel");
+      item = row[key];
+      playSfx("click");
+    };
+    el.appendChild(d);
+  });
+}
+
+async function paintStatus(st) {
+  if (!st || !st.ok) return;
+  document.getElementById("title").textContent = "OpenRCT2 — " + st.park_name;
+  document.getElementById("cash").textContent = st.cash_text;
+  document.getElementById("guests").textContent = st.guests;
+  document.getElementById("rating").textContent = st.rating_text;
+  document.getElementById("date").textContent = st.date;
+  document.getElementById("weather").textContent = st.weather;
+  document.getElementById("pstatus").textContent = st.game_over ? st.result.toUpperCase() : (st.park_open ? "OPEN" : "CLOSED");
+  document.getElementById("news").textContent = st.news || "The park is quiet.";
+  document.getElementById("btnOpen").textContent = st.park_open ? "Close park gates" : "Open park gates";
+  const obj = st.objective || {};
+  let goal = obj.type || "";
+  if (obj.num_guests) goal = obj.num_guests + " guests";
+  document.getElementById("obj").textContent = goal;
+  const built = document.getElementById("builtList");
+  built.innerHTML = "";
+  (st.rides || []).forEach(r => {
+    const d = document.createElement("div");
+    d.textContent = "#" + r.id + " " + r.name + " (" + r.status + ")";
+    d.onclick = () => { built.dataset.ride = r.id; [...built.children].forEach(c => c.classList.remove("sel")); d.classList.add("sel"); };
+    built.appendChild(d);
+  });
+  const staff = (st.staff || []).map(s => s.kind).join(", ") || "None yet";
+  document.getElementById("staffLine").textContent = staff;
+  lastActions = st.n_actions;
+}
+
+async function loadCatalog() {
+  const cat = await jget("/play/catalog?session_id=" + SID);
+  const sel = document.getElementById("scenario");
+  sel.innerHTML = "";
+  (cat.scenarios || []).forEach(s => {
+    const o = document.createElement("option");
+    o.value = s.id; o.textContent = s.name;
+    if (s.id === "gentle_intro") o.selected = true;
+    sel.appendChild(o);
+  });
+  window._cat = cat;
+  showBuildList();
+}
+
+function showBuildList() {
+  const cat = window._cat || {rides:[], stalls:[], scenery:[]};
+  const el = document.getElementById("buildList");
+  const title = document.getElementById("listTitle");
+  if (tool === "ride") {
+    title.textContent = "Rides you can build";
+    fillList(el, cat.rides, "id", r => r.name + "  " + r.cost_text);
+  } else if (tool === "stall") {
+    title.textContent = "Stalls & shops";
+    fillList(el, cat.stalls, "id", r => r.name + "  " + r.cost_text);
+  } else if (tool === "scenery") {
+    title.textContent = "Scenery";
+    fillList(el, cat.scenery, "id", r => r.name + "  " + r.cost_text);
+  } else {
+    title.textContent = "Tool: " + tool;
+    el.innerHTML = "<div class='muted'>Click the park map.</div>";
+  }
+}
+
+async function boot() {
+  await jpost("/play/reset", {session_id: SID, seed: Number(document.getElementById("seed").value||11), scenario: document.getElementById("scenario").value || "gentle_intro"});
+  meta = await jget("/play/meta?session_id=" + SID);
+  await loadCatalog();
+  const st = await jget("/play/status?session_id=" + SID);
+  await paintStatus(st);
+  refreshFrame("A new park");
+  playSfx("open");
+}
+
+document.querySelectorAll(".tool").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".tool").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    tool = btn.dataset.tool;
+    item = "";
+    showBuildList();
+    playSfx("click");
+  };
+});
+
+document.getElementById("park").onclick = async (ev) => {
+  const img = ev.target;
+  const r = img.getBoundingClientRect();
+  const px = (ev.clientX - r.left) * (img.naturalWidth / r.width);
+  const py = (ev.clientY - r.top) * (img.naturalHeight / r.height);
+  const out = await jpost("/play/click", {session_id: SID, tool, item, px, py, hud: true});
+  setMsg(out.message || out.error || "", !out.ok);
+  playSfx(out.sfx || (out.ok ? "place" : "error"));
+  if (out.status) paintStatus(out.status);
+  refreshFrame(out.caption || "");
+};
+
+document.getElementById("park").onmousemove = (ev) => {
+  if (!meta) return;
+  const img = ev.target;
+  const r = img.getBoundingClientRect();
+  const px = (ev.clientX - r.left) * (img.naturalWidth / r.width);
+  const py = (ev.clientY - r.top) * (img.naturalHeight / r.height);
+  const dx = (px - meta.ox) / (meta.tw/2);
+  const dy = (py - meta.oy) / (meta.th/2);
+  const x = Math.floor((dx+dy)/2);
+  const y = Math.floor((dy-dx)/2);
+  document.getElementById("hover").textContent = tool + (item ? ":" + item : "") + "  (" + x + "," + y + ")";
+};
+
+async function stepAction(action) {
+  const out = await jpost("/step", {session_id: SID, action});
+  setMsg(out.message || out.error || "", !out.ok);
+  playSfx(out.ok ? (action.startsWith("wait") ? "wait" : action.includes("open") ? "open" : "click") : "error");
+  const st = await jget("/play/status?session_id=" + SID);
+  paintStatus(st);
+  refreshFrame("");
+}
+
+document.getElementById("btnOpen").onclick = async () => {
+  const st = await jget("/play/status?session_id=" + SID);
+  stepAction("set_park_open:" + (st.park_open ? "false" : "true"));
+};
+document.getElementById("btnWait").onclick = () => stepAction("wait:1");
+document.getElementById("btnWeek").onclick = () => stepAction("wait_days:7");
+document.getElementById("btnHandy").onclick = () => stepAction("hire_staff:handyman");
+document.getElementById("btnMech").onclick = () => stepAction("hire_staff:mechanic");
+document.getElementById("btnNew").onclick = () => boot();
+document.getElementById("btnOpenRide").onclick = () => {
+  const id = document.getElementById("builtList").dataset.ride;
+  if (id) stepAction("set_ride_status:" + id + ",open");
+};
+document.getElementById("btnCloseRide").onclick = () => {
+  const id = document.getElementById("builtList").dataset.ride;
+  if (id) stepAction("set_ride_status:" + id + ",closed");
+};
+
+async function agentOnce() {
+  const out = await jpost("/play/agent_step", {session_id: SID, n: 1});
+  setMsg((out.applied && out.applied[0] && out.applied[0].action) || out.error || "idle", !out.ok);
+  playSfx(out.sfx || "place");
+  if (out.status) paintStatus(out.status);
+  refreshFrame(out.caption || "Manager");
+  return out;
+}
+document.getElementById("btnAgent").onclick = agentOnce;
+document.getElementById("btnWatch").onclick = () => {
+  watching = !watching;
+  document.getElementById("btnWatch").textContent = watching ? "Stop watching" : "Watch manager play";
+  if (watching) {
+    watchTimer = setInterval(async () => {
+      const out = await agentOnce();
+      if (!out.count || out.game_over) {
+        watching = false;
+        clearInterval(watchTimer);
+        document.getElementById("btnWatch").textContent = "Watch manager play";
+        if (out.result === "success") playSfx("cheer");
+      }
+    }, 700);
+  } else if (watchTimer) clearInterval(watchTimer);
+};
+
+document.addEventListener("keydown", (ev) => {
+  if (ev.target.matches("input,select")) return;
+  const map = {Digit1:"path", Digit2:"ride", Digit3:"stall", Digit4:"land", Digit5:"demolish", KeyI:"inspect"};
+  if (map[ev.code]) {
+    document.querySelectorAll(".tool").forEach(b => {
+      b.classList.toggle("active", b.dataset.tool === map[ev.code]);
+    });
+    tool = map[ev.code];
+    showBuildList();
+  }
+  if (ev.code === "Space") { ev.preventDefault(); stepAction("wait:1"); }
+  if (ev.code === "KeyO") stepAction("set_park_open:true");
+});
+
+boot();
+</script>
+</body>
+</html>
