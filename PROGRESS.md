@@ -2,6 +2,32 @@
 
 ## Current phase
 
+Fork PR confirmed. Not ambiguous; no push to upstream.
+
+## Fork PR check (`git remote -v`)
+
+Exact remotes (token redacted):
+
+```
+origin	https://x-access-token:[REDACTED]@github.com/tkuhemiya/OpenRCT2 (fetch)
+origin	https://x-access-token:[REDACTED]@github.com/tkuhemiya/OpenRCT2 (push)
+```
+
+Sanitized origin: `https://github.com/tkuhemiya/OpenRCT2`
+
+- Only remote is `origin`. There is **no** `upstream` remote.
+- Target is **`tkuhemiya/OpenRCT2`**, not `OpenRCT2/OpenRCT2`.
+- Explicit check: `gh pr list --repo tkuhemiya/OpenRCT2 --head themiya/agent-text-api-17ff`
+  → OPEN PR **#1** https://github.com/tkuhemiya/OpenRCT2/pull/1  
+  head `tkuhemiya/OpenRCT2` / `themiya/agent-text-api-17ff` → `develop`  
+  `isCrossRepository: false`
+- Explicit check: `gh pr list --repo OpenRCT2/OpenRCT2 --head themiya/agent-text-api-17ff` → **[]**
+- Explicit check: `gh pr list --repo OpenRCT2/OpenRCT2 --search "agent-text-api"` → **[]**
+
+Did **not** open or push anything against `OpenRCT2/OpenRCT2`. Feature branch is already on the fork; no extra push required for this check.
+
+## README + clean tests
+
 README matches the live API (setup, reference, example loop, limitations).
 Unused `pytest` pin removed from `agent/requirements.txt`.
 
