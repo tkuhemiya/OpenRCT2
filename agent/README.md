@@ -2,24 +2,39 @@
 
 An LLM (or any client) can play a RollerCoaster Tycoon 2–style park **without a
 multimodal model**. The agent loop is JSON + readable text: park HUD, ASCII
-map, legal actions, and a step() that never crashes on bad input.
+map, legal actions, and a `step()` that never crashes on bad input.
 
-This is a **source-faithful simulation** of OpenRCT2 internals
+This is a **source-faithful Python simulation** of OpenRCT2 internals
 (`GameState_t`, `Park::ParkData`, `GameCommand` / GameActions, park rating,
 March–October calendar). The full C++ client is not booted here because
 OpenRCT2 needs original RCT2 data files, which cannot be bundled. See
 [OPENRCT2_HOOK.md](OPENRCT2_HOOK.md) for how this maps onto a live game.
 
-## Quick start
+## Setup
 
-From the repo root:
+- **Python 3.10+** (stdlib only). No `pip install` for the agent loop or tests.
+- Optional, recordings only: **Pillow** plus **ffmpeg** (used by `render_replay.py`).
+- `agent/requirements.txt` documents that; it does not add runtime packages.
+
+From the **repository root**:
+
+```bash
+export PYTHONPATH=agent
+python3 -m openrct2_agent.cli --help
+```
+
+`python3 -m openrct2_agent` is the same CLI. One-shot CLI commands persist
+the park as `logs/sessions/<session>.pkl` (default session id `default`).
+
+## Quick start
 
 ```bash
 export PYTHONPATH=agent
 python3 -m openrct2_agent.cli reset --seed 42 --scenario gentle_intro --text
 ```
 
-Stdio JSON-lines (one JSON object per line in, one out):
+Stdio JSON-lines (one JSON object per line in, one out). The first line is a
+hello banner; then send commands:
 
 ```bash
 export PYTHONPATH=agent
@@ -33,6 +48,7 @@ python3 -m openrct2_agent.cli stdio
 {"cmd": "step", "action": "place_path:9,11"}
 {"cmd": "step", "action": {"type": "place_ride", "ride_type": "merry_go_round", "x": 6, "y": 10}}
 {"cmd": "step", "action": "wait:1"}
+{"cmd": "replay"}
 ```
 
 HTTP:
@@ -40,6 +56,7 @@ HTTP:
 ```bash
 export PYTHONPATH=agent
 python3 -m openrct2_agent.cli serve --port 8765
+# GET /health  GET /help
 ```
 
 ```bash
@@ -47,7 +64,7 @@ curl -s http://127.0.0.1:8765/health
 curl -s -X POST http://127.0.0.1:8765/reset \
   -H 'Content-Type: application/json' \
   -d '{"seed": 42, "scenario": "gentle_intro", "session_id": "p1"}'
-curl -s 'http://127.0.0.1:8765/state?session_id=p1' | python3 -m json.tool | head
+curl -s 'http://127.0.0.1:8765/state?session_id=p1'
 curl -s 'http://127.0.0.1:8765/legal_actions?session_id=p1'
 curl -s -X POST http://127.0.0.1:8765/state \
   -H 'Content-Type: application/json' -d '{"session_id": "p1"}'
@@ -56,6 +73,7 @@ curl -s -X POST http://127.0.0.1:8765/legal_actions \
 curl -s -X POST http://127.0.0.1:8765/step \
   -H 'Content-Type: application/json' \
   -d '{"session_id": "p1", "action": "wait:1"}'
+curl -s 'http://127.0.0.1:8765/replay?session_id=p1'
 ```
 
 Python:
@@ -70,38 +88,90 @@ print(s.step("hire_staff:handyman")["message"])
 print(s.step("set_park_open:true")["result"])
 ```
 
-## Required API
+If `scenario` is omitted, **`forest_frontiers`** is the default.
+
+## API reference
+
+### Calls
 
 | Call | Meaning |
 |---|---|
-| `reset(seed, scenario)` | New game. Deterministic for that seed. |
-| `get_state()` | `text` (full readable dump) + `state` (JSON). Includes `game_over`, `result`, `result_reason`. |
-| `list_legal_actions()` | Grouped schemas + `actions_flat` ids. |
-| `step(action)` | Execute. Invalid actions return `{ok:false, error, code}` — no exceptions to the client. |
-| `apply_replay(replay)` | Reset + replay a previously exported `{seed, scenario, actions}` log. |
+| `reset(seed, scenario)` | New game. Deterministic for that seed + scenario + action sequence. |
+| `get_state()` | `text` (full readable dump) + `state` (JSON). Also `game_over`, `result`, `result_reason`. |
+| `list_legal_actions()` | `text` coach notes, grouped `action_types`, `actions` objects, `actions_flat` ids. |
+| `step(action)` | Execute. Invalid input returns `{ok:false, error, code}` — no client-facing exception. |
+| `export_replay()` / `{cmd:"replay"}` | `{seed, scenario, actions}` log. |
+| `apply_replay(replay)` | Reset + replay that log. Alias: `replay_from`. |
 
-`result` is `undecided` | `success` | `failure`. After game-over, only `reset` starts a new park (`inspect_tile` still works).
+`result` is `undecided` \| `success` \| `failure`. After game-over, only `reset`
+starts a new park (`inspect_tile` still works). `step` also returns a fresh
+`text` + `state` snapshot so you do not have to call `get_state` every turn.
 
-Action ids look like `place_path:7,8`, `place_ride:merry_go_round,6,10`, `wait:1`.
-You may also pass a JSON object: `{"type":"wait","months":1}`.
+Every successful payload includes `ok: true` and `session_id`. Failures include
+`ok: false`, `error` (string), and `code` (e.g. `no_game`, `parse_error`,
+`unknown_action`, `game_over`, `bad_seed`, `unknown_scenario`).
+
+### Action ids
+
+Pick an id from `actions_flat`, or pass a JSON object with `type` plus params.
+Examples:
+
+| Id | JSON |
+|---|---|
+| `place_path:7,8` | `{"type":"place_path","x":7,"y":8}` |
+| `place_ride:merry_go_round,6,10` | `{"type":"place_ride","ride_type":"merry_go_round","x":6,"y":10}` |
+| `place_stall:toilets,8,11` | `{"type":"place_stall","stall_type":"toilets","x":8,"y":11}` |
+| `set_ride_status:0,open` | `{"type":"set_ride_status","ride_id":0,"status":"open"}` |
+| `hire_staff:handyman` | `{"type":"hire_staff","staff_type":"handyman"}` |
+| `set_park_open:true` | `{"type":"set_park_open","open":true}` |
+| `wait:1` | `{"type":"wait","months":1}` |
+| `inspect_tile:9,15` | `{"type":"inspect_tile","x":9,"y":15}` |
+
+Other types: `remove_path`, `buy_land`, `place_scenery`, `demolish_ride`,
+`demolish_stall`, `set_ride_price`, `set_ride_name`, `set_stall_price`,
+`fire_staff`, `set_entrance_fee`, `set_loan`, `set_research_funding`
+(`none`/`minimum`/`normal`/`maximum`), `start_marketing`, `set_park_name`,
+`wait_days` (1–62), `wait_weeks` (1–16). `wait` / `wait_months` is **1–16**
+months. Money fields are **integer pence** (1000 = £10.00). Staff kinds:
+`handyman`, `mechanic`, `security`, `entertainer`.
+
+`list_legal_actions` can list hundreds of tile origins. The flat list is
+sorted (path-adjacent, near the entrance first) and truncated at **800** tile
+ids while wait/hire/open/finance actions are always kept. At least one origin
+per invented ride/stall type is reserved. Full origin grids remain in
+`action_types`.
+
+### HTTP / stdio aliases
+
+| Interface | Reset | State | Legal | Step | Replay |
+|---|---|---|---|---|---|
+| Python | `reset` | `get_state` | `list_legal_actions` | `step` | `export_replay` / `apply_replay` |
+| Stdio `cmd` | `reset`, `new_game` | `get_state`, `state` | `list_legal_actions`, `legal`, `actions` | `step`, `act` | `replay` (export), `apply_replay` |
+| HTTP | `POST /reset` | `GET` or `POST /state` | `GET` or `POST /legal_actions` | `POST /step` | `GET /replay` export, `POST /replay` apply |
+| CLI | `reset` | `state` | `legal` | `step --action …` | `replay` / `apply_replay --action file.json` |
+
+`POST /rpc` accepts the same `{cmd,…}` objects as stdio. `GET /help` lists
+endpoints. Stdio also accepts `quit` / `exit`.
 
 ## Scenarios
 
-| id | Goal |
-|---|---|
-| `gentle_intro` | 80 guests, rating ≥ 600, by end of June Year 1 |
-| `forest_frontiers` | 250 guests, rating ≥ 600, by end of Year 1 (classic beginner park) |
-| `dynamite_dunes` | Park value £25,000 by end of Year 2 |
-| `have_fun` | Sandbox until bankruptcy or 4 years |
+| id | Park | Goal |
+|---|---|---|
+| `gentle_intro` | Gentle Glen | 80 guests **and** rating ≥ 600 by end of June Year 1 |
+| `forest_frontiers` | Forest Frontiers | 250 guests and rating ≥ 600 by end of Year 1 (API default) |
+| `dynamite_dunes` | Dynamite Dunes | Park value £25,000 by end of Year 2 |
+| `have_fun` | Fun Park | Sandbox until bankruptcy or 4 years (park starts open) |
 
 ## How to play (for agents)
 
-1. Pave `#` paths north from the `E` entrance.
-2. Place toilets (`T`), drinks (`D`), food (`F`) touching a path.
+1. Pave `#` paths **north** from the `E` entrance (smaller `y`; `x` grows east).
+2. Place toilets (`T`), drinks (`D`), food (`F`) so they **touch** a `#` path
+   connected to `E`. Isolated buildings do nothing.
 3. Place complete rides (`R`) — no track pieces; each ride is a prebuilt layout.
 4. `set_ride_status:{id},open` then `set_park_open:true`.
 5. Hire a `handyman` and a `mechanic`.
-6. `wait:1` to simulate a month.
+6. `wait:1` to simulate a month (the calendar still finishes those months if
+   you already won mid-month).
 7. Expand with more rides as cash and research allow.
 
 ## Example agent loop
@@ -125,7 +195,7 @@ while True:
         print("illegal:", result["error"])  # never a crash
 ```
 
-One-shot CLI commands **persist** under `logs/sessions/<session>.pkl` (default session `default`):
+One-shot CLI (persists under `logs/sessions/<session>.pkl`):
 
 ```bash
 export PYTHONPATH=agent
@@ -136,17 +206,23 @@ python3 -m openrct2_agent.cli state --session demo --text
 
 ## Known limitations
 
-- Original RCT2 data files are **not** bundled. This is a source-faithful Python sim, not a running `openrct2` process. See `OPENRCT2_HOOK.md`.
-- Map is 18×16 so the whole park fits in text. Not a 128×128 RCT2 map.
+- Original RCT2 data files are **not** bundled. This is a Python sim, not a
+  running `openrct2` process. See `OPENRCT2_HOOK.md`.
+- Map is **18×16** so the whole park fits in text. Not a 128×128 RCT2 map.
 - Rides are **complete prebuilt layouts**, not piece-by-piece track.
 - Buildings must touch a `#` path connected to `E` or guests cannot use them.
-- `list_legal_actions` can list hundreds of tile origins; the flat list is sorted (path-adjacent, near the entrance first). Tile ids are truncated at 800 while wait/hire/open/finance actions are always kept. Full origin grids remain in `action_types`.
+- Park value is scaled so an 18×16 Dynamite Dunes can still hit the classic
+  £25k objective (not a 1:1 OpenRCT2 valuation).
+- `list_legal_actions` truncates tile ids at 800 (see above).
 - Money is integer pence. Dates use RCT’s 8-month year (March–October).
+- The agent loop never sees images. MP4 capture is a human-facing HUD replay
+  (`WATCH.md`); it needs Pillow + ffmpeg and is not part of `step()`.
+- CLI pickle sessions are process-local files, not a multiplayer server.
 
 ## Logging and replay
 
 Every API call and key simulation event is appended as JSONL under `./logs/`
-(repo root). Kinds include:
+(repo root, relative to the working directory). Kinds include:
 
 - `api.reset` / `api.get_state` / `api.list_legal_actions` / `api.step` / `api.apply_replay`
 - `game.start` / `game.over`
@@ -156,7 +232,7 @@ Every API call and key simulation event is appended as JSONL under `./logs/`
 - `game.research` / `game.breakdown` when those happen
 
 Replays can be exported (`GET /replay` or `{cmd:"replay"}`) and applied
-(`POST /replay` or `{cmd:"apply_replay","replay":...}`) to reconstruct the
+(`POST /replay` or `{cmd:"apply_replay","replay":…}`) to reconstruct the
 same park from seed + action log.
 
 ```bash
@@ -166,17 +242,26 @@ PYTHONPATH=agent python3 agent/scripts/render_replay.py logs/replay.json \
   --mp4 logs/agent_play.mp4 --transcript logs/agent_play_transcript.txt
 ```
 
-The **agent never sees images**. The MP4 is a human-facing capture of the text
-HUD/map over time (Pillow + a system monospace font, then ffmpeg). There is no
-live OpenRCT2 window in this environment.
-
 A recorded win (Gentle Glen, seed 11) is committed at
-**`recordings/agent_play.mp4`**. How to watch: `WATCH.md`.
+**`recordings/agent_play.mp4`**. How to watch: [`WATCH.md`](../WATCH.md).
 
 ## Tests
 
+Stdlib `unittest` only (no pytest):
+
+```bash
+python3 -m unittest discover -s agent/tests -v
+```
+
+Or from `agent/`:
+
 ```bash
 cd agent && python3 -m unittest discover -s tests -v
+```
+
+Optional extra (not required for CI of the API):
+
+```bash
 PYTHONPATH=agent python3 agent/scripts/brute_force.py --games 40 --heuristic 8
 ```
 
@@ -184,8 +269,8 @@ PYTHONPATH=agent python3 agent/scripts/brute_force.py --games 40 --heuristic 8
 
 ```
 agent/openrct2_agent/   # engine, actions, renderer, HTTP, stdio
-agent/tests/
-agent/scripts/          # play_and_record.py, render_replay.py, …
+agent/tests/            # unittest (unit + e2e + edge)
+agent/scripts/          # play_and_record.py, render_replay.py, brute_force.py
 agent/OPENRCT2_HOOK.md  # mapping onto live OpenRCT2
 recordings/             # committed agent-play MP4 + transcript
 WATCH.md                # how to watch the recording

@@ -2,7 +2,9 @@
 
 ## Current phase
 
-Phase 4 recording is on disk. Watch path recorded below.
+README matches the live API (setup, reference, example loop, limitations).
+Unused `pytest` line removed from `agent/requirements.txt`. Full unittest
+suite run from a clean `git archive` tree.
 
 ## Recording (this turn)
 

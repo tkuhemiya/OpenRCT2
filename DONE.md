@@ -34,7 +34,7 @@ applied (`apply_replay`) to reconstruct the same park.
 
 ```bash
 export PYTHONPATH=agent
-cd agent && python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s agent/tests -v
 python3 -m openrct2_agent.cli reset --seed 42 --scenario gentle_intro --session demo --text
 python3 -m openrct2_agent.cli step --session demo --action hire_staff:handyman
 python3 agent/scripts/play_and_record.py --seed 11 --scenario gentle_intro --out logs/replay.json
