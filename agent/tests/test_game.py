@@ -21,6 +21,7 @@ from openrct2_agent.art import ensure_all_painters_registered, layout_for, pixel
 from openrct2_agent.audio import sfx, sfx_for_action
 from openrct2_agent.catalog import RIDES, STALLS
 from openrct2_agent.play import action_from_click, click_park
+from openrct2_agent.players import heuristic_policy
 from openrct2_agent.server import Handler
 from openrct2_agent.visual import VisualPark, caption_for
 
@@ -121,6 +122,41 @@ class AgentVisualTests(unittest.TestCase):
         self.assertEqual(caption_for("set_park_open:true"), "Opening the gates!")
         self.assertEqual(sfx_for_action("place_path:1,1"), "place")
 
+    def test_heuristic_playthrough_rebuilds_the_park(self) -> None:
+        """Gentle Glen seed 11: every build/open/wait changes the camera at tick 0."""
+        vis = VisualPark()
+        s = ParkSession("watch-full")
+        s.reset(11, "gentle_intro")
+        start = _png_hash(vis.render(s.state, caption="", tick=0))
+        prev = start
+        n = 0
+        # Entry fee is not drawn on the isometric HUD; everything else is.
+        silent = {"set_entrance_fee"}
+        while n < 250:
+            action = heuristic_policy(s)
+            if not action:
+                break
+            out = s.step(action)
+            self.assertTrue(out["ok"], out)
+            n += 1
+            h = _png_hash(vis.render(s.state, caption="", tick=0))
+            kind = action.split(":", 1)[0]
+            if kind not in silent:
+                self.assertNotEqual(prev, h, f"{action} did not change the park camera")
+            prev = h
+            assert s.state is not None
+            if s.state.result != "undecided":
+                break
+        assert s.state is not None
+        self.assertGreaterEqual(n, 20)
+        self.assertEqual(s.state.result, "success")
+        self.assertGreaterEqual(s.state.num_guests, 80)
+        self.assertGreaterEqual(len(s.state.rides), 1)
+        self.assertNotEqual(start, prev)
+        # After the win the park keeps moving: later ticks must differ.
+        later = _png_hash(vis.render(s.state, caption="", tick=18))
+        self.assertNotEqual(prev, later)
+
 
 class AudioTests(unittest.TestCase):
     def test_wav_header(self) -> None:
@@ -183,6 +219,48 @@ class HttpPlayTests(unittest.TestCase):
         self.assertTrue(st["ok"])
         self.assertIn("text", st)
         self.assertGreaterEqual(st["state"]["map"]["reachable_path_count"], 1)
+
+    def test_agent_play_updates_the_park_camera(self) -> None:
+        """The manager endpoint builds the park and every burst changes the PNG."""
+        sid = "agent-watch"
+        reset = self._post("/play/reset", {"session_id": sid, "seed": 11, "scenario": "gentle_intro"})
+        self.assertTrue(reset["ok"], reset)
+
+        def snap() -> bytes:
+            # Fixed tick so hash changes come from the park, not water ripples.
+            with urllib.request.urlopen(self._url(f"/play/frame.png?session_id={sid}&tick=0")) as resp:
+                return resp.read()
+
+        prev = hashlib.sha256(snap()).hexdigest()
+        start = prev
+        saw_ride = False
+        saw_guests = False
+        result = "undecided"
+        out = {"status": {"guests": 0}}
+        for i in range(30):
+            out = self._post("/play/agent_step", {"session_id": sid, "n": 4})
+            self.assertTrue(out["ok"], out)
+            if not out["count"]:
+                break
+            nxt = hashlib.sha256(snap()).hexdigest()
+            self.assertNotEqual(prev, nxt, f"burst {i} actions {out['applied']} did not change the camera")
+            prev = nxt
+            st = out["status"]
+            if st["rides"]:
+                saw_ride = True
+            if st["guests"] > 0:
+                saw_guests = True
+            result = st.get("result") or result
+            if result == "success":
+                break
+        self.assertTrue(saw_ride, "agent never placed a ride")
+        self.assertTrue(saw_guests)
+        self.assertEqual(result, "success")
+        self.assertNotEqual(start, prev)
+        live = self._post("/state", {"session_id": sid})
+        self.assertEqual(live["state"]["guests"]["in_park"], out["status"]["guests"])
+        self.assertGreaterEqual(len(live["state"]["rides"]), 1)
+        self.assertEqual(live["state"]["result"], "success")
 
 
 if __name__ == "__main__":

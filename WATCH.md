@@ -20,6 +20,10 @@ a terminal or ASCII dump.
 
 Result: **SUCCESS** — 121 guests, rating 771 in 72 agent steps.
 
+Still frames from that same play (isometric camera, not the older top-down
+sprites): `recordings/agent_watch/00_start.png` through `05_success.png`.
+`05` is tick 18 of the winning park — cars and peeps have moved.
+
 ```bash
 vlc recordings/agent_play_gameplay.mp4
 ```
