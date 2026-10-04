@@ -136,10 +136,10 @@ months. Money fields are **integer pence** (1000 = £10.00). Staff kinds:
 `handyman`, `mechanic`, `security`, `entertainer`.
 
 `list_legal_actions` can list hundreds of tile origins. The flat list is
-sorted (path-adjacent, near the entrance first) and truncated at **800** tile
-ids while wait/hire/open/finance actions are always kept. At least one origin
-per invented ride/stall type is reserved. Full origin grids remain in
-`action_types`.
+sorted (path-adjacent, near the entrance first) and **capped at 800 ids**.
+Wait/hire/open/finance actions are always kept; tile origins fill the rest,
+reserving at least one origin per invented ride/stall type. Full origin
+grids remain in `action_types`.
 
 ### HTTP / stdio aliases
 
@@ -213,7 +213,7 @@ python3 -m openrct2_agent.cli state --session demo --text
 - Buildings must touch a `#` path connected to `E` or guests cannot use them.
 - Park value is scaled so an 18×16 Dynamite Dunes can still hit the classic
   £25k objective (not a 1:1 OpenRCT2 valuation).
-- `list_legal_actions` truncates tile ids at 800 (see above).
+- `list_legal_actions` caps the flat id list at 800 (see above).
 - Money is integer pence. Dates use RCT’s 8-month year (March–October).
 - The agent loop never sees images. MP4 capture is a human-facing HUD replay
   (`WATCH.md`); it needs Pillow + ffmpeg and is not part of `step()`.

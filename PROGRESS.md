@@ -3,8 +3,12 @@
 ## Current phase
 
 README matches the live API (setup, reference, example loop, limitations).
-Unused `pytest` line removed from `agent/requirements.txt`. Full unittest
-suite run from a clean `git archive` tree.
+Unused `pytest` pin removed from `agent/requirements.txt`.
+
+**Clean checkout:** `git archive HEAD` → `/tmp/rct-clean-*` with no session
+pickles. `python3 -m unittest discover -s agent/tests -v` → **62/62 OK**
+(8.6s). Same from `cd agent && python3 -m unittest discover -s tests -v`.
+README Python/CLI snippets ran successfully on that tree.
 
 ## Recording (this turn)
 
