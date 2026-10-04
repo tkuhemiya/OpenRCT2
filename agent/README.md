@@ -151,7 +151,8 @@ Every API call and key simulation event is appended as JSONL under `./logs/`
 - `api.reset` / `api.get_state` / `api.list_legal_actions` / `api.step` / `api.apply_replay`
 - `game.start` / `game.over`
 - `game.event` — park news ticker (`topic`: start, month, research, breakdown, ride_test, success, failure)
-- `game.month` — structured end-of-month finance snapshot
+- `game.month` — structured end-of-month finance snapshot (always fired at month wrap, including after a mid-month win)
+- `game.wait` — each `wait` action (requested months vs `months_elapsed`)
 - `game.research` / `game.breakdown` when those happen
 
 Replays can be exported (`GET /replay` or `{cmd:"replay"}`) and applied

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from . import logging_util
 from .catalog import (
     MARKETING_CAMPAIGNS,
     PATH_COST,
@@ -614,11 +615,24 @@ def act_wait(state: GameState, parsed: dict[str, Any]) -> dict[str, Any]:
         return _fail("bad_params", "wait months must be 1–16.")
     before = (state.months_elapsed, state.num_guests, state.cash, state.rating)
     simulate_months(state, months)
+    logging_util.log_event(
+        "game.wait",
+        session=state.session_id,
+        requested_months=months,
+        months_elapsed=state.months_elapsed,
+        day=state.day,
+        guests=state.num_guests,
+        cash=state.cash,
+        rating=state.rating,
+        result=state.result,
+    )
     return _ok(
-        f"Advanced {months} month(s) to {state.month_name} Year {state.year}. "
+        f"Advanced {months} month(s) to {state.day} {state.month_name} Year {state.year} "
+        f"(months_elapsed {before[0]}→{state.months_elapsed}). "
         f"Guests {before[1]}→{state.num_guests}, cash {money_str(before[2])}→{money_str(state.cash)}, "
         f"rating {before[3]}→{state.rating}. Result={state.result}.",
         months=months,
+        months_elapsed=state.months_elapsed,
     )
 
 

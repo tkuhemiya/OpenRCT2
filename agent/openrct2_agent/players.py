@@ -108,6 +108,33 @@ def heuristic_policy(session: ParkSession) -> Optional[str]:
     if cash < 30_000 and data["finance"]["loan"] < data["finance"]["max_loan"]:
         return f"set_loan:{min(data['finance']['max_loan'], data['finance']['loan'] + 100000)}"
 
+    obj = data.get("objective") or {}
+    if obj.get("type") == "park_value_by":
+        have_counts: dict[str, int] = {}
+        for r in rides:
+            have_counts[r["spec_id"]] = have_counts.get(r["spec_id"], 0) + 1
+        for rid in (
+            "wooden_coaster",
+            "looping_coaster",
+            "corkscrew",
+            "junior_coaster",
+            "log_flume",
+            "mini_steel",
+            "river_rapids",
+            "go_karts",
+            "ghost_train",
+        ):
+            if rid not in invented or have_counts.get(rid, 0) >= 2:
+                continue
+            spec = RIDES[rid]
+            if cash < spec.build_cost + 8_000:
+                continue
+            opts = _ids(legal, f"place_ride:{rid},")
+            if opts:
+                return _prefer_near_path(opts, data)
+        if cash < 120_000 and data["finance"]["loan"] < data["finance"]["max_loan"]:
+            return f"set_loan:{min(data['finance']['max_loan'], data['finance']['loan'] + 200000)}"
+
     return "wait:1"
 
 

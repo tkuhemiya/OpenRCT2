@@ -275,6 +275,26 @@ class LoggingTests(unittest.TestCase):
             self.assertTrue(any('"topic": "month"' in ln for ln in lines))
         logging_util.configure()
 
+    def test_wait_logs_month_and_advances_calendar(self) -> None:
+        from openrct2_agent import logging_util
+
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "wait.jsonl")
+            logging_util.configure(path)
+            s = ParkSession("wait-log")
+            s.reset(1, "gentle_intro")
+            s.step("set_park_open:true")
+            s.step("hire_staff:handyman")
+            out = s.step("wait:1")
+            self.assertTrue(out["ok"], out)
+            self.assertGreaterEqual(s.state.months_elapsed, 1)
+            with open(path, encoding="utf-8") as f:
+                blob = f.read()
+            self.assertIn('"kind": "game.month"', blob)
+            self.assertIn('"kind": "game.wait"', blob)
+            self.assertIn('"kind": "game.event"', blob)
+        logging_util.configure()
+
 
 class ReplayApplyTests(unittest.TestCase):
     def test_apply_replay_matches_live_play(self) -> None:

@@ -40,6 +40,17 @@ class HeuristicE2E(unittest.TestCase):
         self.assertGreaterEqual(s.state.num_guests, 250)
         self.assertGreaterEqual(s.state.rating, 600)
 
+    def test_heuristic_wins_dynamite_dunes(self) -> None:
+        s = ParkSession("e2e-dunes")
+        s.reset(7, "dynamite_dunes")
+        summary = play(s, heuristic_policy, max_steps=280)
+        self.assertEqual(
+            summary["result"],
+            "success",
+            msg=f"reason={summary['reason']}\n{summary.get('text','')[-1500:]}",
+        )
+        self.assertGreaterEqual(s.state.park_value, 2_500_000)
+
     def test_heuristic_survives_forest_frontiers_smoke(self) -> None:
         s = ParkSession("e2e-ff")
         s.reset(21, "forest_frontiers")

@@ -27,7 +27,7 @@ Interfaces: Python `ParkSession`, HTTP (`python3 -m openrct2_agent.cli serve`),
 stdio JSON-lines, file-backed CLI (`logs/sessions/*.pkl`).
 
 Logs: JSONL under `./logs` (`api.*`, `game.start`, `game.over`, `game.event`,
-`game.month`, `game.research`, `game.breakdown`). Replays can be exported and
+`game.month`, `game.wait`, `game.research`, `game.breakdown`). Replays can be exported and
 applied (`apply_replay`) to reconstruct the same park.
 
 ## How to run
@@ -45,9 +45,9 @@ Full usage: `agent/README.md`.
 
 ## Tests
 
-- **47** unittest cases (unit + e2e + edge, including JSONL event kinds, apply_replay, HTTP POST `/state` + `/legal_actions`). All passing.
-- Heuristic wins `gentle_intro` and `forest_frontiers`.
-- Brute force: 70 games, **0 crashes**. Heuristic 10/10 intro, 8/8 Forest Frontiers.
+- **49** unittest cases (unit + e2e + edge, including JSONL event kinds, apply_replay, HTTP POST `/state` + `/legal_actions`, Dynamite Dunes win). All passing.
+- Heuristic wins `gentle_intro`, `forest_frontiers`, and `dynamite_dunes`.
+- Brute force round 2: **0 crashes**. Heuristic 12/12 intro, 10/10 then 6/6 Forest Frontiers, 8/8 Dynamite Dunes after B10.
 - Edge: malformed input, game-over, rapid resets, odd seeds, isolated HTTP/CLI sessions, `wait:0`.
 
 ## LLM play
@@ -61,7 +61,7 @@ No agent-loop crashes or hangs.
 
 ## Bugs
 
-See `BUGS.md`. B1–B9 all **fixed**. No open blockers.
+See `BUGS.md`. B1–B11 all **fixed**. No open blockers.
 
 ## Video / replay
 

@@ -506,13 +506,17 @@ def calculate_park_rating(state: GameState) -> int:
 
 
 def calculate_park_value(state: GameState) -> int:
+    """Approximate RCT2 park value, scaled so an 18×16 park can hit classic £25k."""
     result = 0
     for ride in state.rides:
-        result += ride.spec.build_cost // 4
-        result += ride.excitement * 80
+        result += ride.spec.build_cost
+        result += ride.excitement * 350
+        if ride.status == "open":
+            result += ride.spec.build_cost // 5
     for stall in state.stalls:
-        result += stall.spec.build_cost // 5
-    result += state.num_guests * 700  # £7.00 per guest
+        result += stall.spec.build_cost
+    result += state.num_guests * 4000  # £40.00 per guest
+    result += max(0, state.rating) * 80
     return result
 
 
@@ -584,43 +588,56 @@ def _update_warnings(state: GameState, open_rides: list[RideInstance], ride_valu
 
 
 def simulate_days(state: GameState, days: int) -> None:
-    if state.result != "undecided":
-        return
-    for _ in range(days):
+    for _ in range(max(0, days)):
         _simulate_day(state)
-        if state.result != "undecided":
-            return
 
 
 def simulate_months(state: GameState, months: int) -> None:
-    if state.result != "undecided":
-        return
-    for _ in range(months):
+    for _ in range(max(0, months)):
         days = DAYS_IN_MONTH[state.month_index]
-        # Remaining days this month, then full months.
         remaining = days - state.day + 1
         simulate_days(state, remaining)
-        if state.result != "undecided":
-            return
 
 
 def _simulate_day(state: GameState) -> None:
-    state.ticks += 40
-    _update_weather(state)
-    _staff_work(state)
-    _spawn_guests(state)
-    _simulate_guests(state)
-    _update_rides(state)
-    _recalculate(state)
-    _check_objective(state)
-    _check_bankruptcy(state)
-    if state.result != "undecided":
-        return
+    if state.result == "undecided":
+        state.ticks += 40
+        _update_weather(state)
+        _staff_work(state)
+        _spawn_guests(state)
+        _simulate_guests(state)
+        _update_rides(state)
+        _recalculate(state)
+        _check_objective(state)
+        _check_bankruptcy(state)
     days = DAYS_IN_MONTH[state.month_index]
     state.day += 1
     if state.day > days:
         state.day = 1
-        _end_of_month(state)
+        if state.result == "undecided":
+            _end_of_month(state)
+        else:
+            # Calendar still rolls after a mid-month win/loss so wait:N is honest
+            # and month-end JSONL events are not skipped.
+            state.months_elapsed += 1
+            logging_util.log_event(
+                "game.month",
+                session=state.session_id,
+                month=state.months_elapsed,
+                cash=state.cash,
+                guests=state.num_guests,
+                rating=state.rating,
+                park_value=state.park_value,
+                result=state.result,
+                note="calendar_wrap_after_game_over",
+            )
+            _push_news(
+                state,
+                f"End of {MONTHS[(state.months_elapsed - 1) % MONTH_COUNT]} Year "
+                f"{((state.months_elapsed - 1) // MONTH_COUNT) + 1}: "
+                f"cash {money_str(state.cash)}, guests {state.num_guests}, "
+                f"rating {state.rating} (scenario already {state.result}).",
+            )
 
 
 def _update_weather(state: GameState) -> None:

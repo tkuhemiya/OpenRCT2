@@ -13,8 +13,23 @@ Bugs found while building and testing the OpenRCT2 text agent API.
 | B7 | Legal `place_path` list started at the NW corner, not the entrance | Enumerator scanned y=0..h, x=0..w. | **Fixed** (sort by distance; path-adjacent origins first) |
 | B8 | `wait:0` silently advanced one month | `int(parsed.get("months") or 1)` treats 0 as missing. | **Fixed** (`_positive_int`). Edge test `test_wait_out_of_range`. |
 | B9 | One-shot CLI `reset` then `step` started a fresh in-memory game | Each process constructed a new `AgentAPI()`. | **Fixed** (pickle persist under `logs/sessions/`). |
+| B10 | `dynamite_dunes` unwinnable: heuristic 0/6 and Composer 2.5 peaked at ~£13k vs £25k | Park-value formula (`build/4 + E*80 + guests*700`) is full-map RCT scale; 18×16 parks never reach £25,000. | **Fixed**. Value uses construction cost + excitement×350 + £40/guest. Heuristic also builds coasters on `park_value_by`. Re-run: **8/8** heuristic wins. |
+| B11 | Winning `wait:1` skipped month-end JSONL (`game.month` missing) and left `months_elapsed=0` | Objective is checked every day; a mid-month win returned before `_end_of_month`. | **Fixed**. Calendar always finishes the requested wait; `game.month` + `game.wait` log even after a mid-month result. |
 
-## Brute-force (after B4–B6)
+## Brute-force round 2 (this e2e pass)
+
+| Scenario | Games | Crashes | Heuristic wins | Notes |
+|---|---|---|---|---|
+| `gentle_intro` | 52 (12 heuristic + 40 random) | **0** | **12/12** | 5 random failures (never opened a usable park). |
+| `forest_frontiers` | 26 then 14 re-run | **0** | **10/10** then **6/6** | Random mostly undecided at step cap. |
+| `dynamite_dunes` | 14 then 16 re-run | **0** | **0/6** then **8/8** after B10 | First pass exposed B10. |
+| `have_fun` | 10 (4 heuristic + 6 random) | **0** | **4/4** | Time-cap success. |
+
+No hangs. Invalid random actions return errors; the process never crashed.
+
+Logs after B11 (`logs/e2e-event-check-r3.jsonl`): `game.start`, `game.event` (start/success/month), `game.month`, `game.wait`, `game.over` all present on a winning Forest Frontiers game. `months_elapsed` is 1 after the winning `wait:1`.
+
+## Brute-force round 1 (after B4–B6)
 
 | Scenario | Games | Crashes | Heuristic wins | Random notes |
 |---|---|---|---|---|
@@ -36,6 +51,12 @@ Sessions from Composer 2.5 (`c31`,`c32`,`c33`,`c41`) and Grok 4.6 Medium (`g61`,
 | c41 | Composer 2.5 | forest_frontiers | **success** | 274 | 803 | Won in year 1. |
 | g61 | Grok 4.6 Medium | gentle_intro | **success** | 105 | 759 | Clean connected park; **no warnings**. Text was clear enough to play well. |
 | g71 | Grok 4.6 Medium | forest_frontiers | **success** | 309 | 784 | Strong build; one leftover disconnected car ride. |
+| bf-c51 | Composer 2.5 | gentle_intro seed 51 | **success** | 148 | 769 | 75 steps, 0 invalid, 0 crashes. |
+| bf-c52 | Composer 2.5 | gentle_intro seed 52 | **success** | 149 | 757 | 74 steps, 0 invalid. |
+| bf-c53 | Composer 2.5 | gentle_intro seed 53 | **success** | 139 | 754 | Some disconnected coasters; still won. |
+| bf-c54 | Composer 2.5 | forest_frontiers seed 54 | **success** | 306 | 766 | Path warnings on later rides; guests/rating still hit. |
+| bf-c55 | Composer 2.5 | forest_frontiers seed 55 | **success** | 310 | 741 | Same pattern. |
+| bf-c56 | Composer 2.5 | dynamite_dunes seed 56 | **failure** | 361 | 999 | Park value £12.8k / £25k — B10, since fixed. |
 
 Crashes: **none**. Hangs: **none**.
 
