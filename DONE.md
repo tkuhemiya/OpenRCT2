@@ -1,6 +1,31 @@
 # DONE
 
-Text-only LLM agent API for playing an RCT2-style park inside this OpenRCT2 fork.
+Text-only LLM agent API for playing an RCT2-style park on this OpenRCT2 **fork**.
+
+Final verification (this file): every PLAN phase is present, tests pass, BUGS.md
+has no unfixed items, the recording exists, and the PR is open on
+`tkuhemiya/OpenRCT2` only.
+
+## PR
+
+https://github.com/tkuhemiya/OpenRCT2/pull/1
+
+- Branch: `themiya/agent-text-api-17ff` → `develop`
+- Remote: **only** `origin` → `https://github.com/tkuhemiya/OpenRCT2`
+- `gh pr list --repo tkuhemiya/OpenRCT2 --head themiya/agent-text-api-17ff` → OPEN #1
+- `gh pr list --repo OpenRCT2/OpenRCT2 --head themiya/agent-text-api-17ff` → empty
+- Never pushed to `OpenRCT2/OpenRCT2`
+
+## Phase checklist (PLAN.md)
+
+| Phase | What | Status |
+|---|---|---|
+| 0 | `PLAN.md`, `PROGRESS.md`, branch `themiya/agent-text-api-17ff` | Done |
+| 1 | Engine + API + ASCII renderer, no stubs | Done (`agent/openrct2_agent/`) |
+| 2 | JSONL under `./logs`, `agent/README.md` | Done |
+| 3 | Unit/e2e/edge tests, brute force, stronger-model play, `BUGS.md` | Done |
+| 4 | Replay video + transcript | Done (`recordings/agent_play.mp4`) |
+| 5 | PR on the fork only | Done (#1) |
 
 ## What was built
 
@@ -27,8 +52,9 @@ Interfaces: Python `ParkSession`, HTTP (`python3 -m openrct2_agent.cli serve`),
 stdio JSON-lines, file-backed CLI (`logs/sessions/*.pkl`).
 
 Logs: JSONL under `./logs` (`api.*`, `game.start`, `game.over`, `game.event`,
-`game.month`, `game.wait`, `game.research`, `game.breakdown`). Replays can be exported and
-applied (`apply_replay`) to reconstruct the same park.
+`game.month`, `game.wait`, `game.research`, `game.breakdown`).
+
+Full usage: `agent/README.md`.
 
 ## How to run
 
@@ -37,52 +63,46 @@ export PYTHONPATH=agent
 python3 -m unittest discover -s agent/tests -v
 python3 -m openrct2_agent.cli reset --seed 42 --scenario gentle_intro --session demo --text
 python3 -m openrct2_agent.cli step --session demo --action hire_staff:handyman
-python3 agent/scripts/play_and_record.py --seed 11 --scenario gentle_intro --out logs/replay.json
-python3 agent/scripts/render_replay.py logs/replay.json --mp4 logs/agent_play.mp4
 ```
 
-Full usage: `agent/README.md`.
+## Tests (re-run at final verification)
 
-## Tests
+```
+python3 -m unittest discover -s agent/tests -v
+Ran 62 tests in 8.465s
+OK
+```
 
-- **62** unittest cases (unit + e2e + expanded edge: invalid, game-over, rapid reset, long games, odd seeds, malformed HTTP, timeouts). All passing.
 - Heuristic wins `gentle_intro`, `forest_frontiers`, and `dynamite_dunes`.
-- Brute force round 2: **0 crashes**. Heuristic 12/12 intro, 10/10 then 6/6 Forest Frontiers, 8/8 Dynamite Dunes after B10.
-- Grok 4.6 Medium g81/g82/g83: **3/3 success**, HUD clarity 4/5 then B12 text fixes.
-- Edge: malformed input, game-over, rapid resets, odd seeds, isolated HTTP/CLI sessions, `wait:0`.
-
-## LLM play
-
-| Model | Games | Outcome |
-|---|---|---|
-| Composer 2.5 | gentle_intro ×3 + forest ×1 (plus failed retries) | Several wins; failed when buildings were placed far from the entrance path (B7, since fixed) |
-| Grok 4.6 Medium | g61, g71, then g81/g82/g83 | **5/5 success** this campaign; g81–g83 HUD-only wins including Dynamite Dunes. Clarity 4/5 → B12 text fixes. |
-
-No agent-loop crashes or hangs.
+- Brute force: **0 crashes**. Heuristic 12/12 intro, 10/10 then 6/6 Forest
+  Frontiers, 8/8 Dynamite Dunes after B10.
+- Composer 2.5 volume play + Grok 4.6 Medium g81/g82/g83: **3/3 HUD-only
+  success** (including Dynamite Dunes). Clarity 4/5 → B12 text fixes.
+- Clean `git archive` tree: 62/62 OK (no leftover session pickles).
 
 ## Bugs
 
-See `BUGS.md`. B1–B12 all **fixed**. No open blockers.
+See `BUGS.md`. **B1–B12 all Fixed.** No open blockers. Remaining notes in
+BUGS.md (disconnected-ride WARN, all rides draw as `R`, large legal JSON) are
+documented behaviour, not unfixed defects.
 
 ## Video / replay
 
-The agent itself never sees images. There is no live OpenRCT2 GUI here (no
-RCT2 assets). Human capture is a HUD/map replay:
+No live OpenRCT2 GUI (no RCT2 assets). Human capture is a HUD/map replay:
 
-- **`recordings/agent_play.mp4`** — watch this (Gentle Glen seed 11, a win, ~18s)
-- `recordings/agent_play_transcript.txt` — step-by-step ASCII
-- `recordings/replay.json` — machine replay
-- `WATCH.md` — how to watch / regenerate
-- copies: `/opt/cursor/artifacts/agent_play.mp4`
+| Artifact | Path |
+|---|---|
+| **Watch this** | `recordings/agent_play.mp4` (~18s, 72 frames, h264 976×1598) |
+| Transcript | `recordings/agent_play_transcript.txt` |
+| Machine replay | `recordings/replay.json` |
+| How to watch | `WATCH.md` |
 
-Regenerate with the commands in `agent/README.md` / `WATCH.md`.
+Gentle Glen (`gentle_intro`) seed 11, heuristic: **SUCCESS**, 121 guests,
+rating 771. The agent never sees this video.
 
-## PR
+## Limitations (intentional)
 
-Opened on the **fork only** after `git remote -v` showed:
-
-`origin  https://github.com/tkuhemiya/OpenRCT2`
-
-https://github.com/tkuhemiya/OpenRCT2/pull/1  
-
-Branch: `themiya/agent-text-api-17ff` → `develop`. Never pushed to `OpenRCT2/OpenRCT2`.
+- Python sim, not a running `openrct2` process.
+- 18×16 map; rides are prebuilt layouts.
+- Park value is scaled so Dynamite Dunes £25k is reachable on that map.
+- Flat legal-action list capped at 800 ids.

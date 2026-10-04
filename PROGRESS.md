@@ -2,7 +2,19 @@
 
 ## Current phase
 
-Fork PR confirmed. Not ambiguous; no push to upstream.
+**All PLAN phases 0–5 complete.** Final verification passed. See `DONE.md`.
+
+Verified just now:
+
+- Tests: `python3 -m unittest discover -s agent/tests -v` → **62/62 OK** (8.465s)
+- `BUGS.md`: B1–B12 **Fixed**; no unfixed bugs
+- Recording: `recordings/agent_play.mp4` exists (18s, 72 frames, SUCCESS seed 11)
+- PR: https://github.com/tkuhemiya/OpenRCT2/pull/1 OPEN on **fork only**
+- Origin is `tkuhemiya/OpenRCT2`; upstream `OpenRCT2/OpenRCT2` has no matching PR
+
+## Next step
+
+None for the original overnight brief. `DONE.md` is written.
 
 ## Fork PR check (`git remote -v`)
 
@@ -88,10 +100,6 @@ Invalid/stale ids, game-over legal list, mid-game reset, odd seeds (`0`, negativ
 ### Fixes from their notes (B12)
 
 Objective names the last month; map has a tens ruler; warnings no longer print `! (none)`; invented `Name [id]`; legal truncate keeps ≥1 origin per ride/stall type; north-from-E tip.
-
-## Next step
-
-Queued follow-ups: README polish, PR confirm, DONE, synopsis.
 
 ## Open bugs
 
