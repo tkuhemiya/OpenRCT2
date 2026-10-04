@@ -242,8 +242,9 @@ PYTHONPATH=agent python3 agent/scripts/render_replay.py logs/replay.json \
   --mp4 logs/agent_play.mp4 --transcript logs/agent_play_transcript.txt
 ```
 
-A recorded win (Gentle Glen, seed 11) is committed at
-**`recordings/agent_play.mp4`**. How to watch: [`WATCH.md`](../WATCH.md).
+A recorded **gameplay** win (Gentle Glen, seed 11) is committed at
+**`recordings/agent_play_gameplay.mp4`** (top-down sprites, not a terminal).
+Sprites live in `agent/assets/sprites/`. How to watch: [`WATCH.md`](../WATCH.md).
 
 ## Tests
 
@@ -269,9 +270,10 @@ PYTHONPATH=agent python3 agent/scripts/brute_force.py --games 40 --heuristic 8
 
 ```
 agent/openrct2_agent/   # engine, actions, renderer, HTTP, stdio
+agent/assets/sprites/   # original pixel-art tiles / rides / stalls / guests
 agent/tests/            # unittest (unit + e2e + edge)
-agent/scripts/          # play_and_record.py, render_replay.py, brute_force.py
+agent/scripts/          # play_and_record.py, record_gameplay.py, render_replay.py, …
 agent/OPENRCT2_HOOK.md  # mapping onto live OpenRCT2
-recordings/             # committed agent-play MP4 + transcript
+recordings/             # gameplay MP4 + ASCII HUD replay
 WATCH.md                # how to watch the recording
 ```

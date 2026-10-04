@@ -8,7 +8,7 @@ Verified just now:
 
 - Tests: `python3 -m unittest discover -s agent/tests -v` → **62/62 OK** (8.465s)
 - `BUGS.md`: B1–B12 **Fixed**; no unfixed bugs
-- Recording: `recordings/agent_play.mp4` exists (18s, 72 frames, SUCCESS seed 11)
+- Recording: `recordings/agent_play_gameplay.mp4` (~40s top-down sprites) plus ASCII `recordings/agent_play.mp4`
 - PR: https://github.com/tkuhemiya/OpenRCT2/pull/1 OPEN on **fork only**
 - Origin is `tkuhemiya/OpenRCT2`; upstream `OpenRCT2/OpenRCT2` has no matching PR
 
@@ -109,4 +109,6 @@ None unfixed.
 
 1–17 as before.
 18. Stronger-model HUD complaints that did not block wins still got fixed (B12) so the next agent is less likely to place isolated buildings or miss umbrella stalls.
-19. No live RCT2 window here; the human recording is a Pillow/ffmpeg HUD replay committed under `recordings/` (not gitignored `logs/`).
+20. Follow-up: original pixel-art sprites in `agent/assets/sprites/` and a
+    top-down gameplay MP4 at `recordings/agent_play_gameplay.mp4` (not a
+    terminal dump). Still no RCT2 data files.

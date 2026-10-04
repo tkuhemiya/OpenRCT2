@@ -88,17 +88,17 @@ documented behaviour, not unfixed defects.
 
 ## Video / replay
 
-No live OpenRCT2 GUI (no RCT2 assets). Human capture is a HUD/map replay:
+No live OpenRCT2 window (no RCT2 assets). Human capture is a **top-down
+park camera** using original sprites in `agent/assets/sprites/`:
 
 | Artifact | Path |
 |---|---|
-| **Watch this** | `recordings/agent_play.mp4` (~18s, 72 frames, h264 976×1598) |
-| Transcript | `recordings/agent_play_transcript.txt` |
-| Machine replay | `recordings/replay.json` |
+| **Watch this** | `recordings/agent_play_gameplay.mp4` (~40s, 10 fps, 792×774) |
+| Start / end stills | `recordings/agent_play_gameplay_start.png` / `_end.png` |
+| ASCII HUD (older) | `recordings/agent_play.mp4` |
 | How to watch | `WATCH.md` |
 
-Gentle Glen (`gentle_intro`) seed 11, heuristic: **SUCCESS**, 121 guests,
-rating 771. The agent never sees this video.
+Gentle Glen seed 11, heuristic: **SUCCESS**, 121 guests, rating 771.
 
 ## Limitations (intentional)
 
