@@ -321,3 +321,24 @@ discord-rpc
 
 # CMake
 cmake-build-*/
+
+#########################
+## Agent API
+#########################
+logs/*.jsonl
+logs/*.json
+logs/*.log
+logs/*.mp4
+logs/*.txt
+logs/replay_render/
+logs/sessions/
+!logs/.gitkeep
+agent/logs/*.jsonl
+agent/logs/*.json
+agent/logs/*.log
+!agent/logs/.gitkeep
+logs/sessions/
+agent/logs/sessions/
+agent/.pytest_cache/
+agent/assets/source/
+.pytest_cache/
