@@ -21,7 +21,8 @@ Incorporate Composer 2.5 / Grok 4.6 Medium play reports into BUGS.md, then write
 
 ## Open bugs
 
-- B7 (legal path-id order) — accepted, documented.
+None blocking. B7 (path-id order) is fixed; LLM play reports still incoming.
+
 
 ## Decisions
 

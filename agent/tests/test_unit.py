@@ -236,6 +236,12 @@ class LegalActionTests(unittest.TestCase):
         self.assertIn("wait:1", flat)
         self.assertTrue(any(a.startswith("place_path:") for a in flat))
         self.assertTrue(any(a.startswith("hire_staff:") for a in flat))
+        # First suggested path should be near the entrance, not the NW corner.
+        first_path = next(a for a in flat if a.startswith("place_path:"))
+        xy = first_path.split(":", 1)[1]
+        x, y = (int(p) for p in xy.split(","))
+        ex, ey = s.state.entrance
+        self.assertLessEqual(abs(x - ex) + abs(y - ey), 6)
 
     def test_money_str(self) -> None:
         self.assertEqual(money_str(1000), "£10.00")

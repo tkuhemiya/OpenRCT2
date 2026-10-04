@@ -10,7 +10,7 @@ Bugs found while building and testing the OpenRCT2 text agent API.
 | B4 | Heuristic never won `forest_frontiers` (≤130 guests vs 250) | Guest spawn/stay too low for an 18×16 park; rating crushed by litter. | **Fixed** (higher gen/stay, milder litter penalty). Re-run: 8/8 heuristic wins. |
 | B5 | Park rating 0 after opening a ride / `test_open_park_with_rides_gets_guests` | (1) Rating not recalculated until time passed. (2) OpenRCT2-style litter term subtracted 600 for modest dirt. (3) Guests marked `lost` whenever no usable ride. | **Fixed** (`_recalculate` after successful `step`; litter scaled; lost only after 2 days with nothing to ride) |
 | B6 | Merry-go-round downtime 100 after one month without a mechanic | Daily breakdown chance ~7% stacking +20–50 downtime. | **Fixed** (gentler breakdowns). Mechanic still important long-term. |
-| B7 | Legal `place_path` list starts at the north-west of owned land, not next to the entrance | Enumerator scans y=0..h, x=0..w. Text warns to build from `E`. Heuristic sorts by distance to entrance. | **Accepted** (documented). LLM agents should read the map, not the first id. |
+| B7 | Legal `place_path` list starts at the north-west of owned land, not next to the entrance | Enumerator scanned y=0..h, x=0..w. | **Fixed** (sort by Manhattan distance to entrance). Test `test_legal_contains_wait_and_open`. |
 
 ## Brute-force (after fixes)
 

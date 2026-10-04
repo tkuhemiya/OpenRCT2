@@ -42,6 +42,13 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
                         buy_tiles.append([x, y])
                         break
 
+    def _near(p: list[int]) -> int:
+        return abs(p[0] - state.entrance[0]) + abs(p[1] - state.entrance[1])
+
+    path_tiles.sort(key=_near)
+    remove_tiles.sort(key=_near)
+    buy_tiles.sort(key=_near)
+    empty_owned.sort(key=_near)
     for x, y in path_tiles:
         actions.append(
             {
@@ -113,6 +120,7 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
                 ok, _ = footprint_ok(state, x, y, w, h)
                 if ok:
                     origins.append([x, y])
+        origins.sort(key=lambda p: abs(p[0] - state.entrance[0]) + abs(p[1] - state.entrance[1]))
         stall_origins[spec.id] = origins
         for x, y in origins[:30]:
             actions.append(
