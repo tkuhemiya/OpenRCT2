@@ -337,5 +337,7 @@ agent/logs/*.jsonl
 agent/logs/*.json
 agent/logs/*.log
 !agent/logs/.gitkeep
+logs/sessions/
+agent/logs/sessions/
 agent/.pytest_cache/
 .pytest_cache/
