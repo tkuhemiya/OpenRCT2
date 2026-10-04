@@ -466,7 +466,9 @@ def calculate_park_rating(state: GameState) -> int:
     result -= 200 - ((total_exc + total_int) // 10)
 
     litter = sum(t.litter for row in state.tiles for t in row)
-    result -= 600 - (4 * (150 - min(150, litter * 8)))
+    # OpenRCT2 only penalises *old* litter heavily. Scale gently so a busy park
+    # with a couple of dirty tiles does not instantly drop 600 rating points.
+    result -= min(180, litter * 6)
     result -= state.rating_casualty_penalty
     return max(0, min(999, result))
 
@@ -486,8 +488,8 @@ def _recalculate(state: GameState) -> None:
     state.rating = calculate_park_rating(state)
     state.park_value = calculate_park_value(state)
     state.company_value = state.park_value - state.loan + state.cash
-    open_rides = [r for r in state.rides if r.status == "open" and r.downtime < 80]
-    ride_value = sum(_ride_value_for_money(r) for r in open_rides)
+    open_rides = [r for r in state.rides if r.status == "open"]
+    ride_value = sum(_ride_value_for_money(r) for r in open_rides if r.downtime < 85)
     # Guest generation: OpenRCT2 uses a 0..65535 probability per tick.
     # We convert to "guests per day" later. Store a 0-1000 score here.
     rating_factor = max(0, state.rating - 200)
@@ -503,10 +505,10 @@ def _recalculate(state: GameState) -> None:
     path_ok = 1 if len(path_reachable(state)) > 3 else 0
     gen = 0
     if state.park_open and path_ok:
-        gen = 8 + rating_factor // 25 + ride_value // 80 + campaign_bonus + weather_mod - fee_penalty
+        gen = 14 + rating_factor // 16 + ride_value // 45 + campaign_bonus + weather_mod - fee_penalty
         if state.num_guests > state.suggested_guest_max:
-            gen = gen // 4
-        gen = max(0, min(80, gen))
+            gen = gen // 3
+        gen = max(0, min(120, gen))
     state.guest_generation_probability = gen
     _update_warnings(state, open_rides, ride_value)
 
@@ -612,7 +614,7 @@ def _staff_work(state: GameState) -> None:
     state.rng.shuffle(dirty)
     i = 0
     for _h in handymen:
-        for _ in range(8):
+        for _ in range(14):
             if i >= len(dirty):
                 break
             x, y = dirty[i]
@@ -640,9 +642,8 @@ def _spawn_guests(state: GameState) -> None:
     if not state.park_open:
         return
     n = state.guest_generation_probability
-    # Stochastic rounding.
-    extra = 1 if state.rng.randrange(100) < (n % 4) * 20 else 0
-    spawn = max(0, n // 2 + extra)
+    extra = 1 if state.rng.randrange(100) < (n % 3) * 25 else 0
+    spawn = max(0, (n * 2) // 3 + extra)
     if state.weather == "rain":
         spawn = max(0, spawn - 1)
     if state.weather == "storm":
@@ -681,7 +682,7 @@ def _simulate_guests(state: GameState) -> None:
         r
         for r in state.rides
         if r.status == "open"
-        and r.downtime < 50
+        and r.downtime < 80
         and adjacent_to_reachable_path(state, r.x, r.y, r.w, r.h, reachable)
     ]
     stalls = [s for s in state.stalls if adjacent_to_reachable_path(state, s.x, s.y, s.w, s.h, reachable)]
@@ -736,8 +737,7 @@ def _simulate_guests(state: GameState) -> None:
         if g.thirst > 200 and not drink:
             g.happiness = max(0, g.happiness - 16)
         if g.toilet > 210 and not toilets:
-            g.happiness = max(0, g.happiness - 20)
-            g.lost = True
+            g.happiness = max(0, g.happiness - 12)
 
         # Ride
         if open_rides and g.energy > 40 and g.happiness > 40 and g.rides_today < 4:
@@ -773,17 +773,18 @@ def _simulate_guests(state: GameState) -> None:
                 # Queue / litter by the ride.
                 rx, ry = ride.x, ride.y
                 if state.in_bounds(rx, ry + ride.h) and state.tile(rx, ry + ride.h).kind == "path":
-                    if state.rng.random() < 0.12:
+                    if state.rng.random() < 0.05:
                         state.tile(rx, ry + ride.h).litter = min(3, state.tile(rx, ry + ride.h).litter + 1)
 
         # Lost if they cannot find anything.
         if not open_rides:
-            g.happiness = max(0, g.happiness - 10)
-            g.lost = True
+            g.happiness = max(0, g.happiness - 8)
+            if g.days_in_park >= 2:
+                g.lost = True
 
         g.rides_today = 0
         # Leave?
-        stay_cap = 4 + (3 if g.happiness > 150 else 0) + min(3, len(g.rides_ridden))
+        stay_cap = 7 + (5 if g.happiness > 140 else 1) + min(5, len(g.rides_ridden))
         if (
             g.leaving
             or g.happiness < 35
@@ -839,9 +840,9 @@ def _update_rides(state: GameState) -> None:
         if ride.status != "open":
             continue
         # Breakdown chance from reliability.
-        chance = max(1, 18 - ride.spec.reliability // 8)
+        chance = max(1, 8 - ride.spec.reliability // 20)
         if state.rng.randrange(100) < chance:
-            ride.downtime = min(100, ride.downtime + state.rng.randint(20, 50))
+            ride.downtime = min(100, ride.downtime + state.rng.randint(8, 22))
             ride.breakdowns += 1
             if ride.downtime >= 70:
                 _push_news(state, f"{ride.spec.name} #{ride.id} has broken down.")

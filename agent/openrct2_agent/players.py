@@ -34,19 +34,15 @@ def heuristic_policy(session: ParkSession) -> Optional[str]:
     invented = set(data["research"]["invented"])
 
     path_ids = _ids(legal, "place_path:")
-    # 1. Spine of paths from the entrance (larger y first, then around).
-    if path_ids:
-        # Prefer tiles closer to existing paths: sort by distance to entrance.
-        ex, ey = data["map"]["entrance"]
+    ex, ey = data["map"]["entrance"]
 
-        def path_key(aid: str) -> tuple[int, int, int]:
-            _, xy = aid.split(":", 1)
-            x, y = (int(p) for p in xy.split(","))
-            return (abs(x - ex) + abs(y - ey), -y, x)
+    def path_key(aid: str) -> tuple[int, int, int]:
+        _, xy = aid.split(":", 1)
+        x, y = (int(p) for p in xy.split(","))
+        return (abs(x - ex) + abs(y - ey), -y, x)
 
-        # Keep paving until we have a decent network.
-        if data["map"]["reachable_path_count"] < 28 and cash > 20_000:
-            return sorted(path_ids, key=path_key)[0]
+    if path_ids and cash > 20_000 and data["map"]["reachable_path_count"] < 36:
+        return sorted(path_ids, key=path_key)[0]
 
     stall_want = ["toilets", "drinks_stall", "burger_bar", "information_kiosk", "umbrella_stall", "ice_cream"]
     have_stall = {s["spec_id"] for s in stalls}
@@ -54,7 +50,7 @@ def heuristic_policy(session: ParkSession) -> Optional[str]:
         if sid in have_stall or sid not in invented:
             continue
         opts = _ids(legal, f"place_stall:{sid},")
-        if opts and cash > STALLS[sid].build_cost + 30_000:
+        if opts and cash > STALLS[sid].build_cost + 8_000:
             return _prefer_near_path(opts, data)
 
     ride_want = [
@@ -79,7 +75,7 @@ def heuristic_policy(session: ParkSession) -> Optional[str]:
         if rid in have_ride or rid not in invented:
             continue
         spec = RIDES[rid]
-        if cash < spec.build_cost + 40_000:
+        if cash < spec.build_cost + 12_000:
             continue
         opts = _ids(legal, f"place_ride:{rid},")
         if opts:
@@ -90,6 +86,8 @@ def heuristic_policy(session: ParkSession) -> Optional[str]:
         return "hire_staff:handyman"
     if rides and "mechanic" not in kinds:
         return "hire_staff:mechanic"
+    if sum(1 for s in staff if s["kind"] == "handyman") < 2 and cash > 40_000:
+        return "hire_staff:handyman"
     if len(rides) >= 3 and "entertainer" not in kinds and cash > 80_000:
         return "hire_staff:entertainer"
 
@@ -100,8 +98,8 @@ def heuristic_policy(session: ParkSession) -> Optional[str]:
     if not open_park and (rides or stalls):
         return "set_park_open:true"
 
-    if data["finance"]["entrance_fee"] > 1000 and data["guests"]["in_park"] < 20:
-        return "set_entrance_fee:500"
+    if data["finance"]["entrance_fee"] > 500 and data["guests"]["in_park"] < 40:
+        return "set_entrance_fee:200"
 
     # Expand paths once park is running and we still have land.
     if path_ids and cash > 100_000 and data["map"]["reachable_path_count"] < 50:

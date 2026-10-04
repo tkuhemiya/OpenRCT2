@@ -117,6 +117,10 @@ PYTHONPATH=agent python3 agent/scripts/render_replay.py logs/replay.json \
 The **agent never sees images**. The MP4 is a human-facing capture of the text
 HUD/map over time.
 
+A recorded win (Gentle Glen, seed 11): `logs/agent_play.mp4` after you run the
+commands above. The same file is copied to the cloud-agent artifacts folder
+when produced in this environment.
+
 ## Tests
 
 ```bash

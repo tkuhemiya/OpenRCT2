@@ -32,6 +32,7 @@ from .engine import (
     release,
     simulate_days,
     simulate_months,
+    _recalculate,
 )
 
 
@@ -170,7 +171,10 @@ def execute(state: GameState, action: Any) -> dict[str, Any]:
         known = ", ".join(sorted(ACTIONS))
         return _fail("unknown_action", f"Unknown action type {typ!r}. Known types: {known}.")
     try:
-        return handler(state, parsed)
+        result = handler(state, parsed)
+        if result.get("ok"):
+            _recalculate(state)
+        return result
     except Exception as exc:  # noqa: BLE001 — API must never crash the agent
         return _fail("internal_error", f"Internal error executing {typ}: {exc}")
 
