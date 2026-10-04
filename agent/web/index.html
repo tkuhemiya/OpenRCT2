@@ -107,6 +107,12 @@
   .msg.bad { color: #7a1008; font-weight: 700; }
   .row { display: flex; gap: 6px; }
   .row > * { flex: 1; }
+  .bar { height: 8px; background: #2a1a0c; border: 1px solid #e8c43c; margin-top: 3px; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(#8ed05a, #3d8c28); }
+  .keys { font-size: 10px; color: #5a4030; margin-top: 8px; }
+  .flash { animation: cash 0.35s ease; }
+  @keyframes cash { from { color: #fff; } to { color: var(--gold); } }
+  .park-wrap { background: linear-gradient(#6aa8d8, #163016); }
 </style>
 </head>
 <body>
@@ -117,7 +123,7 @@
   </div>
   <div class="stats">
     <div>Cash<b id="cash">£0.00</b></div>
-    <div>Guests<b id="guests">0</b></div>
+    <div>Guests<b id="guests">0</b><div class="bar"><i id="guestBar" style="width:0%"></i></div></div>
     <div>Rating<b id="rating">0.00</b></div>
     <div>Date<b id="date">—</b></div>
     <div>Weather<b id="weather">—</b></div>
@@ -126,17 +132,18 @@
   <div class="layout">
     <div class="tools">
       <h3>Construction</h3>
-      <button class="tool active" data-tool="path">Path</button>
-      <button class="tool" data-tool="ride">Ride</button>
-      <button class="tool" data-tool="stall">Stall / shop</button>
+      <button class="tool active" data-tool="path">1  Path</button>
+      <button class="tool" data-tool="ride">2  Ride</button>
+      <button class="tool" data-tool="stall">3  Stall / shop</button>
       <button class="tool" data-tool="scenery">Scenery</button>
-      <button class="tool" data-tool="land">Buy land</button>
-      <button class="tool" data-tool="demolish">Demolish</button>
-      <button class="tool" data-tool="inspect">Inspect</button>
+      <button class="tool" data-tool="land">4  Buy land</button>
+      <button class="tool" data-tool="demolish">5  Demolish</button>
+      <button class="tool" data-tool="inspect">I  Inspect</button>
       <h3>Park</h3>
       <button class="gold" id="btnOpen">Open park gates</button>
-      <button id="btnWait">Wait 1 month</button>
+      <button id="btnWait">Wait 1 month (Space)</button>
       <button id="btnWeek">Wait 1 week</button>
+      <button id="btnOpenAll">Open all rides</button>
       <div class="row">
         <button id="btnHandy">Hire handyman</button>
         <button id="btnMech">Hire mechanic</button>
@@ -148,7 +155,8 @@
       <h3>Agent</h3>
       <button class="gold" id="btnAgent">Manager builds 1 step</button>
       <button id="btnWatch">Watch manager play</button>
-      <div class="muted" id="agentNote">The text API drives this same park. Watch the isometric view update when the agent acts.</div>
+      <div class="muted" id="agentNote">Same engine as the text agent. Watch the park change when the manager builds.</div>
+      <div class="keys">1 path · 2 ride · 3 stall · 4 land · 5 smash · O open gates · Space wait</div>
     </div>
     <div class="park-wrap">
       <img id="park" alt="Park camera">
@@ -211,19 +219,26 @@ function setMsg(text, bad) {
   el.className = "msg" + (bad ? " bad" : "");
 }
 
+let lastCaption = "";
+let hoverGhost = "";
+let lastCash = null;
+
 function refreshFrame(caption) {
+  if (caption) lastCaption = caption;
   const img = document.getElementById("park");
   const q = new URLSearchParams({
     session_id: SID,
     tick: String(tick++),
-    caption: caption || "",
+    caption: lastCaption,
     hud: "1"
   });
+  if (hoverGhost) q.set("ghost", hoverGhost);
   img.src = "/play/frame.png?" + q.toString();
 }
 
 function fillList(el, rows, key, labelFn) {
   el.innerHTML = "";
+  let first = "";
   rows.forEach(row => {
     if (row.invented === false) return;
     const d = document.createElement("div");
@@ -235,14 +250,24 @@ function fillList(el, rows, key, labelFn) {
       playSfx("click");
     };
     el.appendChild(d);
+    if (!first) { first = row[key]; d.classList.add("sel"); }
   });
+  if (first && !item) item = first;
 }
 
 async function paintStatus(st) {
   if (!st || !st.ok) return;
   document.getElementById("title").textContent = "OpenRCT2 — " + st.park_name;
   document.getElementById("cash").textContent = st.cash_text;
+  if (lastCash !== null && st.cash !== lastCash) {
+    document.getElementById("cash").classList.remove("flash");
+    void document.getElementById("cash").offsetWidth;
+    document.getElementById("cash").classList.add("flash");
+  }
+  lastCash = st.cash;
   document.getElementById("guests").textContent = st.guests;
+  const need = (st.objective && st.objective.num_guests) || 0;
+  document.getElementById("guestBar").style.width = need ? Math.min(100, (st.guests / need) * 100) + "%" : "0%";
   document.getElementById("rating").textContent = st.rating_text;
   document.getElementById("date").textContent = st.date;
   document.getElementById("weather").textContent = st.weather;
@@ -343,6 +368,11 @@ document.getElementById("park").onmousemove = (ev) => {
   const x = Math.floor((dx+dy)/2);
   const y = Math.floor((dy-dx)/2);
   document.getElementById("hover").textContent = tool + (item ? ":" + item : "") + "  (" + x + "," + y + ")";
+  if ((tool === "ride" || tool === "stall" || tool === "scenery") && item) {
+    hoverGhost = tool + "," + item + "," + x + "," + y;
+  } else {
+    hoverGhost = "";
+  }
 };
 
 async function stepAction(action) {
@@ -397,6 +427,13 @@ document.getElementById("btnWatch").onclick = () => {
   } else if (watchTimer) clearInterval(watchTimer);
 };
 
+document.getElementById("btnOpenAll").onclick = async () => {
+  const st = await jget("/play/status?session_id=" + SID);
+  for (const r of (st.rides || [])) {
+    if (r.status !== "open") await stepAction("set_ride_status:" + r.id + ",open");
+  }
+};
+
 document.addEventListener("keydown", (ev) => {
   if (ev.target.matches("input,select")) return;
   const map = {Digit1:"path", Digit2:"ride", Digit3:"stall", Digit4:"land", Digit5:"demolish", KeyI:"inspect"};
@@ -412,6 +449,7 @@ document.addEventListener("keydown", (ev) => {
 });
 
 boot();
+setInterval(() => refreshFrame(), 340);
 </script>
 </body>
 </html>

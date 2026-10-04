@@ -19,6 +19,7 @@ from .art import (
     paint_peep,
     paint_ride,
     paint_scenery,
+    paint_sky,
     paint_stall,
     paint_ticker,
     paint_tile,
@@ -45,8 +46,14 @@ class VisualPark:
         lay = layout_for(state.map_w, state.map_h, hud=hud)
         frame = Image.new("RGBA", (lay.width, lay.height), (18, 40, 16, 255))
         draw = ImageDraw.Draw(frame)
-        # Sky wash behind the isometric diamond.
-        draw.rectangle([0, lay.hud, lay.width, lay.height], fill=(22, 48, 22))
+        paint_sky(draw, lay, state.weather)
+
+        pathish = {
+            (x, y)
+            for y in range(state.map_h)
+            for x in range(state.map_w)
+            if state.tile(x, y).kind in ("path", "entrance")
+        }
 
         occupied_trees: set[tuple[int, int]] = set()
         for r in state.rides:
@@ -65,7 +72,15 @@ class VisualPark:
                 if y < 0 or y >= state.map_h:
                     continue
                 t = state.tile(x, y)
-                paint_tile(draw, x, y, t.kind, t.owned, t.litter, tick, lay)
+                connected = None
+                if t.kind in ("path", "entrance"):
+                    connected = (
+                        (x, y - 1) in pathish,
+                        (x + 1, y) in pathish,
+                        (x, y + 1) in pathish,
+                        (x - 1, y) in pathish,
+                    )
+                paint_tile(draw, x, y, t.kind, t.owned, t.litter, tick, lay, connected=connected)
 
         for diag in range(state.map_w + state.map_h - 1):
             for x in range(state.map_w):
