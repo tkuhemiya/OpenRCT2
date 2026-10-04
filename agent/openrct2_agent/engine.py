@@ -10,6 +10,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
+from . import logging_util
 from .catalog import (
     DAYS_IN_MONTH,
     MARKETING_CAMPAIGNS,
@@ -208,6 +209,7 @@ class GameState:
     warnings: list[str] = field(default_factory=list)
     month_start_cash: int = 0
     weekly_profit: int = 0
+    session_id: Optional[str] = None
 
     @property
     def year(self) -> int:
@@ -232,7 +234,7 @@ class GameState:
         return self.tiles[y][x]
 
 
-def new_game(seed: int, scenario: ScenarioSpec) -> GameState:
+def new_game(seed: int, scenario: ScenarioSpec, session_id: Optional[str] = None) -> GameState:
     rng = random.Random(seed)
     w, h = scenario.map_w, scenario.map_h
     entrance_x = w // 2
@@ -296,6 +298,7 @@ def new_game(seed: int, scenario: ScenarioSpec) -> GameState:
             "min_rating": 600,
         },
         month_start_cash=scenario.starting_cash,
+        session_id=session_id,
     )
     # Gentle intro: 4-month deadline (end of June Year 1) encoded as year=0.
     if scenario.id == "gentle_intro":
@@ -307,10 +310,39 @@ def new_game(seed: int, scenario: ScenarioSpec) -> GameState:
     return state
 
 
+def _news_topic(text: str) -> str:
+    if text.startswith("Welcome"):
+        return "start"
+    if text.startswith("End of "):
+        return "month"
+    if text.startswith("Research complete"):
+        return "research"
+    if "broken down" in text:
+        return "breakdown"
+    if "test complete" in text:
+        return "ride_test"
+    if text.startswith("SCENARIO COMPLETE"):
+        return "success"
+    if text.startswith("SCENARIO FAILED"):
+        return "failure"
+    return "news"
+
+
 def _push_news(state: GameState, text: str) -> None:
     state.news.append(NewsItem(month=state.months_elapsed, text=text))
     if len(state.news) > 24:
         state.news = state.news[-24:]
+    logging_util.log_event(
+        "game.event",
+        session=state.session_id,
+        topic=_news_topic(text),
+        text=text,
+        month=state.months_elapsed,
+        guests=state.num_guests,
+        cash=state.cash,
+        rating=state.rating,
+        result=state.result,
+    )
 
 
 def footprint_ok(state: GameState, x: int, y: int, w: int, h: int, *, allow_trees: bool = False) -> tuple[bool, str]:
@@ -845,6 +877,14 @@ def _update_rides(state: GameState) -> None:
             ride.downtime = min(100, ride.downtime + state.rng.randint(8, 22))
             ride.breakdowns += 1
             if ride.downtime >= 70:
+                logging_util.log_event(
+                    "game.breakdown",
+                    session=state.session_id,
+                    ride_id=ride.id,
+                    ride=ride.spec.name,
+                    downtime=ride.downtime,
+                    month=state.months_elapsed,
+                )
                 _push_news(state, f"{ride.spec.name} #{ride.id} has broken down.")
         # Tiny rating jitter after open, still deterministic.
         jitter = state.rng.randint(-4, 4)
@@ -893,6 +933,21 @@ def _end_of_month(state: GameState) -> None:
     )
     _check_objective(state)
     _check_bankruptcy(state)
+    logging_util.log_event(
+        "game.month",
+        session=state.session_id,
+        month=state.months_elapsed,
+        cash=state.cash,
+        guests=state.num_guests,
+        rating=state.rating,
+        park_value=state.park_value,
+        costs=total,
+        wages=wages,
+        running=running,
+        research=research,
+        interest=interest,
+        result=state.result,
+    )
 
 
 def _advance_research(state: GameState) -> None:
@@ -910,6 +965,14 @@ def _advance_research(state: GameState) -> None:
             state.research_queue.remove(unlocked)
         state.research_next = state.research_queue[0] if state.research_queue else None
         name = RIDES[unlocked].name if unlocked in RIDES else STALLS.get(unlocked, type("T", (), {"name": unlocked})).name
+        logging_util.log_event(
+            "game.research",
+            session=state.session_id,
+            unlocked=unlocked,
+            name=name,
+            next=state.research_next,
+            month=state.months_elapsed,
+        )
         _push_news(state, f"Research complete: {name} is now available to build.")
 
 

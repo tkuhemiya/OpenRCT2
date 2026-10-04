@@ -46,7 +46,7 @@ class ParkSession:
                 "code": "bad_seed",
                 "session_id": self.session_id,
             }
-        self.state = new_game(seed_i, SCENARIOS[scenario])
+        self.state = new_game(seed_i, SCENARIOS[scenario], session_id=self.session_id)
         self.replay = {
             "session_id": self.session_id,
             "seed": seed_i,
@@ -180,6 +180,87 @@ class ParkSession:
     def export_replay(self) -> dict[str, Any]:
         return dict(self.replay)
 
+    def apply_replay(self, replay: Any) -> dict[str, Any]:
+        """Reset and replay a previously exported action log. Deterministic."""
+        if not isinstance(replay, dict):
+            result = {
+                "ok": False,
+                "error": "Replay must be a JSON object with seed, scenario, and actions.",
+                "code": "bad_replay",
+                "session_id": self.session_id,
+            }
+            logging_util.log_event("api.apply_replay", session=self.session_id, ok=False, code="bad_replay")
+            return result
+        inner = replay.get("replay") if isinstance(replay.get("replay"), dict) else replay
+        seed = inner.get("seed", 1)
+        scenario = inner.get("scenario", "forest_frontiers")
+        actions = inner.get("actions")
+        if not isinstance(actions, list):
+            result = {
+                "ok": False,
+                "error": "Replay is missing an 'actions' list.",
+                "code": "bad_replay",
+                "session_id": self.session_id,
+            }
+            logging_util.log_event("api.apply_replay", session=self.session_id, ok=False, code="bad_replay")
+            return result
+        reset_out = self.reset(seed, scenario)
+        if not reset_out.get("ok"):
+            return reset_out
+        applied: list[dict[str, Any]] = []
+        for i, act in enumerate(actions):
+            step_out = self.step(act)
+            applied.append(
+                {
+                    "index": i,
+                    "action": act,
+                    "ok": step_out.get("ok"),
+                    "code": step_out.get("code"),
+                    "error": step_out.get("error"),
+                }
+            )
+            if not step_out.get("ok"):
+                result = {
+                    "ok": False,
+                    "error": f"Replay stopped at action {i} ({act!r}): {step_out.get('error')}",
+                    "code": "replay_failed",
+                    "session_id": self.session_id,
+                    "applied": applied,
+                    "game_over": step_out.get("game_over"),
+                    "result": step_out.get("result"),
+                    "result_reason": step_out.get("result_reason"),
+                }
+                logging_util.log_event(
+                    "api.apply_replay",
+                    session=self.session_id,
+                    ok=False,
+                    code="replay_failed",
+                    index=i,
+                    action=act,
+                )
+                return result
+        snap = self.get_state()
+        logging_util.log_event(
+            "api.apply_replay",
+            session=self.session_id,
+            ok=True,
+            applied=len(actions),
+            result=snap.get("result"),
+        )
+        return {
+            "ok": True,
+            "error": None,
+            "session_id": self.session_id,
+            "applied": len(actions),
+            "game_over": snap["game_over"],
+            "result": snap["result"],
+            "result_reason": snap["result_reason"],
+            "text": snap["text"],
+            "state": snap["state"],
+        }
+
+    replay_from = apply_replay
+
 
 class AgentAPI:
     """Multi-session facade used by HTTP/CLI. Default session is 'default'."""
@@ -205,6 +286,11 @@ class AgentAPI:
     def step(self, action: Any, session_id: Optional[str] = None) -> dict[str, Any]:
         return self.session(session_id).step(action)
 
+    def apply_replay(self, replay: Any, session_id: Optional[str] = None) -> dict[str, Any]:
+        return self.session(session_id).apply_replay(replay)
+
+    replay_from = apply_replay
+
     def dispatch(self, payload: dict[str, Any]) -> dict[str, Any]:
         """JSON-RPC-ish: {cmd, ...params, session_id?}."""
         if not isinstance(payload, dict):
@@ -222,10 +308,20 @@ class AgentAPI:
                 return self.step(payload.get("action"), sid)
             if cmd in ("replay", "export_replay"):
                 return {"ok": True, "replay": self.session(sid).export_replay()}
+            if cmd in ("apply_replay", "replay_from", "load_replay"):
+                replay = payload.get("replay") if isinstance(payload.get("replay"), dict) else payload
+                return self.apply_replay(replay, sid)
             if cmd in ("help",):
                 return {
                     "ok": True,
-                    "commands": ["reset", "get_state", "list_legal_actions", "step", "replay"],
+                    "commands": [
+                        "reset",
+                        "get_state",
+                        "list_legal_actions",
+                        "step",
+                        "replay",
+                        "apply_replay",
+                    ],
                     "scenarios": sorted(SCENARIOS),
                     "example": {
                         "cmd": "reset",
@@ -235,7 +331,7 @@ class AgentAPI:
                 }
             return {
                 "ok": False,
-                "error": f"Unknown cmd {cmd!r}. Try help, reset, get_state, list_legal_actions, step.",
+                "error": f"Unknown cmd {cmd!r}. Try help, reset, get_state, list_legal_actions, step, apply_replay.",
                 "code": "unknown_cmd",
             }
         except Exception as exc:  # noqa: BLE001

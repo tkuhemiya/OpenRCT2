@@ -38,7 +38,7 @@ def run_stdio() -> None:
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="OpenRCT2 text agent CLI")
-    p.add_argument("cmd", nargs="?", help="reset|state|legal|step|stdio|serve|help")
+    p.add_argument("cmd", nargs="?", help="reset|state|legal|step|replay|apply_replay|stdio|serve|help")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--scenario", default="forest_frontiers")
     p.add_argument("--action", default=None)
@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> None:
             "  python -m openrct2_agent.cli state --text\n"
             "  python -m openrct2_agent.cli legal\n"
             "  python -m openrct2_agent.cli step --action wait:1\n"
+            "  python -m openrct2_agent.cli replay\n"
+            "  python -m openrct2_agent.cli apply_replay --action logs/replay.json\n"
         )
         return
     if args.cmd == "stdio":
@@ -85,6 +87,22 @@ def main(argv: list[str] | None = None) -> None:
         out = session.step(action)
     elif args.cmd == "replay":
         out = {"ok": True, "replay": session.export_replay()}
+    elif args.cmd in ("apply_replay", "replay_from"):
+        if not args.action:
+            _print({"ok": False, "error": "Pass --action with replay JSON or a file path", "code": "bad_params"})
+            return
+        raw = args.action
+        try:
+            if raw.lstrip().startswith("{") or raw.lstrip().startswith("["):
+                replay: Any = json.loads(raw)
+            else:
+                from pathlib import Path
+
+                replay = json.loads(Path(raw).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            _print({"ok": False, "error": f"Could not read replay: {exc}", "code": "bad_replay"})
+            return
+        out = session.apply_replay(replay)
     else:
         _print({"ok": False, "error": f"Unknown cmd {args.cmd}", "code": "unknown_cmd"})
         return

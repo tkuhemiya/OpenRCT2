@@ -20,12 +20,15 @@ and are not in this repo. Mapping for a future live plugin is in
 | `get_state()` | Readable ASCII HUD+map (`text`) and structured JSON (`state`) |
 | `list_legal_actions()` | Grouped schemas + `actions_flat` ids |
 | `step(action)` | Execute, or `{ok:false, error, code}` — never a crash |
+| `apply_replay(replay)` | Reset + replay `{seed, scenario, actions}` |
 | `result` / `game_over` | `undecided` / `success` / `failure` plus reason |
 
 Interfaces: Python `ParkSession`, HTTP (`python3 -m openrct2_agent.cli serve`),
 stdio JSON-lines, file-backed CLI (`logs/sessions/*.pkl`).
 
-Logs: JSONL under `./logs` (`api.*`, `game.start`, `game.over`).
+Logs: JSONL under `./logs` (`api.*`, `game.start`, `game.over`, `game.event`,
+`game.month`, `game.research`, `game.breakdown`). Replays can be exported and
+applied (`apply_replay`) to reconstruct the same park.
 
 ## How to run
 
@@ -42,7 +45,7 @@ Full usage: `agent/README.md`.
 
 ## Tests
 
-- **41** unittest cases (unit + e2e + edge). All passing.
+- **47** unittest cases (unit + e2e + edge, including JSONL event kinds, apply_replay, HTTP POST `/state` + `/legal_actions`). All passing.
 - Heuristic wins `gentle_intro` and `forest_frontiers`.
 - Brute force: 70 games, **0 crashes**. Heuristic 10/10 intro, 8/8 Forest Frontiers.
 - Edge: malformed input, game-over, rapid resets, odd seeds, isolated HTTP/CLI sessions, `wait:0`.

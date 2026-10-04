@@ -49,6 +49,10 @@ curl -s -X POST http://127.0.0.1:8765/reset \
   -d '{"seed": 42, "scenario": "gentle_intro", "session_id": "p1"}'
 curl -s 'http://127.0.0.1:8765/state?session_id=p1' | python3 -m json.tool | head
 curl -s 'http://127.0.0.1:8765/legal_actions?session_id=p1'
+curl -s -X POST http://127.0.0.1:8765/state \
+  -H 'Content-Type: application/json' -d '{"session_id": "p1"}'
+curl -s -X POST http://127.0.0.1:8765/legal_actions \
+  -H 'Content-Type: application/json' -d '{"session_id": "p1"}'
 curl -s -X POST http://127.0.0.1:8765/step \
   -H 'Content-Type: application/json' \
   -d '{"session_id": "p1", "action": "wait:1"}'
@@ -74,8 +78,9 @@ print(s.step("set_park_open:true")["result"])
 | `get_state()` | `text` (full readable dump) + `state` (JSON). Includes `game_over`, `result`, `result_reason`. |
 | `list_legal_actions()` | Grouped schemas + `actions_flat` ids. |
 | `step(action)` | Execute. Invalid actions return `{ok:false, error, code}` — no exceptions to the client. |
+| `apply_replay(replay)` | Reset + replay a previously exported `{seed, scenario, actions}` log. |
 
-`result` is `undecided` | `success` | `failure`. After game-over, only `reset` starts a new park.
+`result` is `undecided` | `success` | `failure`. After game-over, only `reset` starts a new park (`inspect_tile` still works).
 
 Action ids look like `place_path:7,8`, `place_ride:merry_go_round,6,10`, `wait:1`.
 You may also pass a JSON object: `{"type":"wait","months":1}`.
@@ -135,13 +140,23 @@ python3 -m openrct2_agent.cli state --session demo --text
 - Map is 18×16 so the whole park fits in text. Not a 128×128 RCT2 map.
 - Rides are **complete prebuilt layouts**, not piece-by-piece track.
 - Buildings must touch a `#` path connected to `E` or guests cannot use them.
-- `list_legal_actions` can list hundreds of tile origins; the flat list is sorted (path-adjacent, near the entrance first) and truncated per type.
+- `list_legal_actions` can list hundreds of tile origins; the flat list is sorted (path-adjacent, near the entrance first). Tile ids are truncated at 800 while wait/hire/open/finance actions are always kept. Full origin grids remain in `action_types`.
 - Money is integer pence. Dates use RCT’s 8-month year (March–October).
 
 ## Logging and replay
 
-Every API call is appended as JSONL under `./logs/` (repo root). Key game events
-(`game.start`, `game.over`) are logged too.
+Every API call and key simulation event is appended as JSONL under `./logs/`
+(repo root). Kinds include:
+
+- `api.reset` / `api.get_state` / `api.list_legal_actions` / `api.step` / `api.apply_replay`
+- `game.start` / `game.over`
+- `game.event` — park news ticker (`topic`: start, month, research, breakdown, ride_test, success, failure)
+- `game.month` — structured end-of-month finance snapshot
+- `game.research` / `game.breakdown` when those happen
+
+Replays can be exported (`GET /replay` or `{cmd:"replay"}`) and applied
+(`POST /replay` or `{cmd:"apply_replay","replay":...}`) to reconstruct the
+same park from seed + action log.
 
 ```bash
 PYTHONPATH=agent python3 agent/scripts/play_and_record.py \

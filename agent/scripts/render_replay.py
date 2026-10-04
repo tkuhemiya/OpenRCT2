@@ -166,9 +166,6 @@ def _init_font() -> None:
         while len(rows) < 9:
             rows.append("00000")
         _PATTERNS[ch] = tuple(rows[:9])
-    for d in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        if d not in _PATTERNS and d in letters:
-            pass
 
 
 def color_for(ch: str) -> tuple[int, int, int]:

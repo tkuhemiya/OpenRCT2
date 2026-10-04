@@ -118,5 +118,54 @@ class PersistenceCliTests(unittest.TestCase):
         self.assertIn("Hired", buf2.getvalue())
 
 
+class HttpAliasTests(unittest.TestCase):
+    def test_post_state_legal_and_replay(self) -> None:
+        import json
+        import threading
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+
+        from openrct2_agent.server import Handler
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+
+        def post(path: str, data: dict) -> dict:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{port}{path}",
+                data=json.dumps(data).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        try:
+            sid = "http-audit"
+            reset = post("/reset", {"seed": 1, "scenario": "gentle_intro", "session_id": sid})
+            self.assertTrue(reset["ok"], reset)
+            state = post("/state", {"session_id": sid})
+            self.assertTrue(state["ok"])
+            self.assertIn("text", state)
+            self.assertFalse(state["game_over"])
+            legal = post("/legal_actions", {"session_id": sid})
+            self.assertTrue(legal["ok"])
+            self.assertIn("wait:1", legal["actions_flat"])
+            step = post("/step", {"session_id": sid, "action": "wait:1"})
+            self.assertTrue(step["ok"], step)
+            exported = post("/rpc", {"cmd": "replay", "session_id": sid})
+            applied = post(
+                "/replay",
+                {"session_id": "http-audit-clone", "replay": exported["replay"]},
+            )
+            self.assertTrue(applied["ok"], applied)
+            self.assertEqual(applied["applied"], 1)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
 if __name__ == "__main__":
     unittest.main()

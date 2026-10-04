@@ -18,14 +18,25 @@ from .engine import (
 def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict[str, Any]:
     """Return grouped + flattened legal actions. Always includes wait / inspect / finance."""
     if state.result != "undecided":
+        inspect = {
+            "id": f"inspect_tile:{state.entrance[0]},{state.entrance[1]}",
+            "type": "inspect_tile",
+            "params": {"x": state.entrance[0], "y": state.entrance[1]},
+            "description": f"Inspect a tile (game is over; reset() to start a new park)",
+        }
         return {
             "game_over": True,
             "result": state.result,
             "result_reason": state.result_reason,
-            "actions": [],
-            "actions_flat": [],
-            "action_types": [],
-            "text": f"Game over ({state.result}): {state.result_reason}. Only reset() is available.",
+            "count": 1,
+            "actions": [inspect],
+            "actions_flat": [inspect["id"]],
+            "action_types": [{"type": "inspect_tile", "params": {"x": "int", "y": "int"}}],
+            "truncated": False,
+            "text": (
+                f"Game over ({state.result}): {state.result_reason}. "
+                "Call reset() to start a new park. inspect_tile still works."
+            ),
         }
 
     actions: list[dict[str, Any]] = []
@@ -311,10 +322,23 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
             "description": "Advance 1 week",
         }
     )
+    actions.append(
+        {
+            "id": f"inspect_tile:{state.entrance[0]},{state.entrance[1]}",
+            "type": "inspect_tile",
+            "params": {"x": state.entrance[0], "y": state.entrance[1]},
+            "description": f"Inspect the entrance tile {state.entrance} (any in-bounds x,y is legal)",
+        }
+    )
 
-    if len(actions) > max_tile_actions:
-        # Keep all non-tile actions; trim place_* origins already capped per type.
-        pass
+    TILE_TYPES = {"place_path", "remove_path", "buy_land", "place_ride", "place_stall", "place_scenery"}
+    core = [a for a in actions if a["type"] not in TILE_TYPES]
+    tile = [a for a in actions if a["type"] in TILE_TYPES]
+    budget = max(0, max_tile_actions - len(core))
+    truncated = len(tile) > budget
+    if truncated:
+        tile = tile[:budget]
+    actions = tile + core
 
     text_lines = [
         f"{len(actions)} legal actions. Build a connected # path from the entrance {state.entrance} FIRST.",
@@ -328,6 +352,11 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
         "You may also pass JSON: {\"type\":\"place_ride\",\"ride_type\":\"merry_go_round\",\"x\":7,\"y\":10}.",
         "Suggested ride/stall origins in the flat list are already sorted: path-adjacent first.",
     ]
+    if truncated:
+        text_lines.append(
+            f"Tile-placement ids were truncated to keep the list usable "
+            f"(cap {max_tile_actions}; {len(core)} management actions always kept)."
+        )
     action_types = [
         {
             "type": "place_path",
@@ -363,6 +392,7 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
         {"type": "wait", "params": {"months": "1-16"}},
         {"type": "set_park_open", "params": {"open": "bool"}},
         {"type": "hire_staff", "params": {"staff_type": list(STAFF_HIRE_COST)}},
+        {"type": "inspect_tile", "params": {"x": "int", "y": "int"}},
     ]
     return {
         "game_over": False,
@@ -371,5 +401,6 @@ def list_legal_actions(state: GameState, *, max_tile_actions: int = 800) -> dict
         "actions": actions,
         "actions_flat": [a["id"] for a in actions],
         "action_types": action_types,
+        "truncated": truncated,
         "text": "\n".join(text_lines),
     }

@@ -3,8 +3,12 @@
 Endpoints:
   POST /reset              JSON {seed, scenario, session_id?}
   GET  /state              ?session_id=
+  POST /state              JSON {session_id?}
   GET  /legal_actions      ?session_id=
+  POST /legal_actions      JSON {session_id?}
   POST /step               JSON {action, session_id?}
+  GET  /replay             export action log
+  POST /replay             apply {seed, scenario, actions} (or {replay: ...})
   POST /rpc                JSON {cmd, ...}
   GET  /health
 """
@@ -76,8 +80,12 @@ class Handler(BaseHTTPRequestHandler):
                     "endpoints": {
                         "POST /reset": "{seed, scenario, session_id?}",
                         "GET /state": "?session_id=",
+                        "POST /state": "{session_id?}",
                         "GET /legal_actions": "?session_id=",
+                        "POST /legal_actions": "{session_id?}",
                         "POST /step": "{action, session_id?}",
+                        "GET /replay": "?session_id=  (export)",
+                        "POST /replay": "{seed, scenario, actions} or {replay}",
                         "POST /rpc": "{cmd, ...}",
                     },
                     "scenarios": ["gentle_intro", "forest_frontiers", "dynamite_dunes", "have_fun"],
@@ -105,8 +113,18 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path in ("/reset", "/new_game"):
             self._send(200, API.reset(body.get("seed", 1), body.get("scenario", "forest_frontiers"), sid))
             return
+        if parsed.path in ("/state", "/get_state"):
+            self._send(200, API.get_state(sid))
+            return
+        if parsed.path in ("/legal_actions", "/actions", "/list_legal_actions"):
+            self._send(200, API.list_legal_actions(sid))
+            return
         if parsed.path in ("/step", "/act"):
             self._send(200, API.step(body.get("action"), sid))
+            return
+        if parsed.path in ("/replay", "/apply_replay", "/replay_from"):
+            replay = body.get("replay") if isinstance(body.get("replay"), dict) else body
+            self._send(200, API.apply_replay(replay, sid))
             return
         if parsed.path in ("/rpc", "/dispatch"):
             self._send(200, API.dispatch(body))

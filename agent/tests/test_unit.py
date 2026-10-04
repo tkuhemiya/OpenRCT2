@@ -268,7 +268,65 @@ class LoggingTests(unittest.TestCase):
             self.assertGreaterEqual(len(lines), 2)
             self.assertTrue(any("api.reset" in ln for ln in lines))
             self.assertTrue(any("api.step" in ln for ln in lines))
+            self.assertTrue(any('"kind": "game.start"' in ln for ln in lines))
+            self.assertTrue(any('"kind": "game.event"' in ln for ln in lines))
+            self.assertTrue(any('"kind": "game.month"' in ln for ln in lines))
+            self.assertTrue(any('"topic": "start"' in ln for ln in lines))
+            self.assertTrue(any('"topic": "month"' in ln for ln in lines))
         logging_util.configure()
+
+
+class ReplayApplyTests(unittest.TestCase):
+    def test_apply_replay_matches_live_play(self) -> None:
+        live = ParkSession("live")
+        live.reset(5, "gentle_intro")
+        legal = live.list_legal_actions()
+        path = next(a for a in legal["actions_flat"] if a.startswith("place_path:"))
+        actions = [path, "hire_staff:handyman", "set_park_open:true", "wait:1"]
+        for a in actions:
+            self.assertTrue(live.step(a)["ok"], a)
+        exported = live.export_replay()
+        self.assertEqual(exported["actions"], actions)
+        clone = ParkSession("clone")
+        out = clone.apply_replay(exported)
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["applied"], len(actions))
+        self.assertEqual(clone.get_state()["text"], live.get_state()["text"])
+        self.assertEqual(clone.state.cash, live.state.cash)
+
+    def test_apply_replay_bad_payload(self) -> None:
+        s = ParkSession("bad-replay")
+        self.assertFalse(s.apply_replay("nope")["ok"])
+        self.assertEqual(s.apply_replay({"seed": 1, "scenario": "gentle_intro"})["code"], "bad_replay")
+
+    def test_dispatch_apply_replay(self) -> None:
+        api = AgentAPI()
+        api.dispatch({"cmd": "reset", "seed": 4, "scenario": "gentle_intro", "session_id": "r1"})
+        api.dispatch({"cmd": "step", "action": "wait:1", "session_id": "r1"})
+        exported = api.dispatch({"cmd": "replay", "session_id": "r1"})
+        out = api.dispatch({"cmd": "apply_replay", "session_id": "r2", "replay": exported["replay"]})
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(api.get_state("r2")["state"]["date"]["months_elapsed"], 1)
+
+
+class LegalCapTests(unittest.TestCase):
+    def test_max_tile_actions_keeps_wait(self) -> None:
+        s = ParkSession()
+        s.reset(1, "forest_frontiers")
+        uncapped = list_legal_actions(s.state, max_tile_actions=10_000)
+        capped = list_legal_actions(s.state, max_tile_actions=40)
+        self.assertTrue(capped["truncated"])
+        self.assertGreater(uncapped["count"], capped["count"])
+        self.assertIn("wait:1", capped["actions_flat"])
+        self.assertIn("set_park_open:true", capped["actions_flat"])
+        self.assertTrue(any(a.startswith("hire_staff:") for a in capped["actions_flat"]))
+
+    def test_inspect_tile_is_listed(self) -> None:
+        s = ParkSession()
+        s.reset(1, "gentle_intro")
+        legal = s.list_legal_actions()
+        self.assertTrue(any(a.startswith("inspect_tile:") for a in legal["actions_flat"]))
+        self.assertIn("wait:1", legal["actions_flat"])
 
 
 class DispatchTests(unittest.TestCase):
